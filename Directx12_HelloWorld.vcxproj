@@ -170,9 +170,11 @@
     <ClInclude Include="CommandQueue.h" />
     <ClInclude Include="d3dApp.h" />
     <ClInclude Include="d3dx12.h" />
+    <ClInclude Include="Events.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="GameTimer.h" />
     <ClInclude Include="Helpers.h" />
+    <ClInclude Include="KeyCodes.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
