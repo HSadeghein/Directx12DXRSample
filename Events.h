@@ -157,7 +157,7 @@ public:
 		, TotalTime(fTotalTime)
 	{}
 
-	double ElapsedTime;
+	double ElapsedTime;	
 	double TotalTime;
 };
 

@@ -116,3 +116,12 @@ void CommandQueue::WaitForFenceValue(uint64_t fenceValue)
 		::WaitForSingleObject(g_FenceEvent, static_cast<DWORD>(duration.count()));
 	}
 }
+Microsoft::WRL::ComPtr<ID3D12CommandQueue> CommandQueue::GetD3D12CommandQueue() const
+{
+	return g_d3d12CommandQueue;
+}
+
+void CommandQueue::Flush()
+{
+	WaitForFenceValue(Signal());
+}
