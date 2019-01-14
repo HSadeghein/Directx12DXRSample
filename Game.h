@@ -3,7 +3,6 @@
 #include<string>
 #include<DirectXMath.h>
 #include "Events.h"
-
 class Window;
 class Game : public std::enable_shared_from_this<Game>
 {
@@ -23,7 +22,7 @@ public:
 protected:
 	friend class Window;
 	std::shared_ptr<Window> g_pWindow;
-
+	
 	/**
 	 *  Update the game logic.
 	 */
@@ -74,6 +73,9 @@ protected:
 	 * Invoked when the registered window instance is destroyed.
 	 */
 	virtual void OnWindowDestroy();
+
+	int GetWidth() const;
+	int GetHeight() const;
 
 private:
 	std::wstring g_Name;

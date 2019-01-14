@@ -13,7 +13,7 @@
 #include"GameTimer.h"
 
 class Game;
-
+class Tutorial1;
 class Window
 {
 public:
@@ -34,6 +34,7 @@ public:
 	void ToggleVSync();
 
 	bool IsFullScreen() const;
+	bool IsTearingSupported() const;
 
 	void SetFullScreen(bool fullScreen);
 	void ToggleFullScreen();

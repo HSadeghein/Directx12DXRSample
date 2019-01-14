@@ -14,7 +14,6 @@ Game::Game(const std::wstring & name, int width, int height, bool vSync)
 Game::~Game()
 {
 	assert(!g_pWindow && "Use Game::Destroy() before destruction.");
-
 }
 
 bool Game::Initialize()
@@ -39,7 +38,7 @@ void Game::Destroy()
 
 void Game::OnUpdate(UpdateEventArgs& e)
 {
-	g_pWindow->SetVSync(false);
+	//g_pWindow->SetVSync(false);
 	//std::wstring s = std::to_wstring(e.TotalTime) + L"\n";
 	//OutputDebugString(s.c_str());
 }
@@ -91,4 +90,14 @@ void Game::OnWindowDestroy()
 	// destroyed, then any resources which are associated 
 	// to the window must be released.
 	UnloadContent();
+}
+
+int Game::GetWidth() const
+{
+	return g_Width;
+}
+
+int Game::GetHeight() const
+{
+	return g_Height;
 }

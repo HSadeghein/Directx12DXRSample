@@ -1,5 +1,5 @@
 #include "CommandQueue.h"
-
+#include"Helpers.h"
 
 
 //----------------------------------------------------------------------------------------------------------------
@@ -64,7 +64,7 @@ Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> CommandQueue::GetCommandList(
 	}
 	else
 	{
-		CreateCommandList(commandAllocator);
+		commandList = CreateCommandList(commandAllocator);
 	}
 
 	//The SetPrivateDataInterface will increment the COM object reference(commandAllocator)
@@ -75,11 +75,10 @@ Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> CommandQueue::GetCommandList(
 //----------------------------------------------------------------------------------------------------------------
 uint64_t CommandQueue::ExecuteCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> list)
 {
-	list->Close();
-
+	ThrowifFailed(list->Close());
 	ID3D12CommandAllocator* commandAllocator;
 	UINT dataSize = sizeof(commandAllocator);
-	ThrowifFailed(list->GetPrivateData(__uuidof(ID3D12CommandAllocator), &dataSize, commandAllocator));
+	ThrowifFailed(list->GetPrivateData(__uuidof(ID3D12CommandAllocator), &dataSize, &commandAllocator));
 
 	ID3D12CommandList* const ppCommandList[] = { list.Get() };
 

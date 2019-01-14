@@ -11,6 +11,7 @@
 Window::Window(HWND hWnd, const std::wstring & windowName, int clientWidth, int clientHeight, bool vSync) :
 	g_hWnd(hWnd), g_WindowName(windowName), g_ClientWidth(clientWidth), g_ClientHeight(clientHeight), g_VSync(vSync)
 {
+	g_Fullscreen = false;
 	Application& app = Application::Get();
 
 	g_UpdateTimer.Reset();
@@ -97,6 +98,11 @@ void Window::ToggleVSync()
 bool Window::IsFullScreen() const
 {
 	return g_Fullscreen;
+}
+
+bool Window::IsTearingSupported() const
+{
+	return g_IsTearingSupported;
 }
 
 // Set the fullscreen state of the window.
