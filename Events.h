@@ -1,7 +1,6 @@
 #pragma once
 #include "KeyCodes.h"
-sadsad
-//HI
+
 // Base class for all event args
 class EventArgs
 {
