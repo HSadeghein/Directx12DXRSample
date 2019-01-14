@@ -53,7 +53,7 @@ Application::Application(HINSTANCE hInst) : g_hInstance(hInst),g_TearingSupporte
 		MessageBoxA(NULL, "Unable to register the window class.", "Error", MB_OK | MB_ICONERROR);
 	}
 
-	g_dxgiAdapter = GetAdapter(true);
+	g_dxgiAdapter = GetAdapter(false);
 	if (g_dxgiAdapter)
 	{
 		g_d3d12Device = CreateDevice(g_dxgiAdapter);
