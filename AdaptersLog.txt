@@ -1,6 +1,0 @@
-***Adapters : 
-Intel(R) HD Graphics 4600
-***Adapters : 
-NVIDIA GeForce GTX 970M
-***Adapters : 
-Microsoft Basic Render Driver
