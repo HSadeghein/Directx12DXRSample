@@ -64,7 +64,7 @@ protected:
 	Window(HWND hWnd, const std::wstring& windowName, int clientWidth, int clientHeight, bool vSync);
 	virtual ~Window();
 
-	void CalculateFrameStatics(GameTimer& timer);
+	//void CalculateFrameStatics(const GameTimer& timer, const std::string& name) const;
 
 	// Register a Game with this window. This allows
 	// the window to callback functions in the Game class.
@@ -108,8 +108,8 @@ private:
 	bool g_VSync;
 	bool g_Fullscreen;
 
-	GameTimer g_UpdateTimer;
-	GameTimer g_RenderTimer;
+	GameTimer *g_UpdateTimer;
+	GameTimer *g_RenderTimer;
 
 
 	uint64_t g_FrameCounter;

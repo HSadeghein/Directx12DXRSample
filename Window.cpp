@@ -14,8 +14,11 @@ Window::Window(HWND hWnd, const std::wstring & windowName, int clientWidth, int 
 	g_Fullscreen = false;
 	Application& app = Application::Get();
 
-	g_UpdateTimer.Reset();
-	g_RenderTimer.Reset();
+	g_UpdateTimer = new	GameTimer("Update");
+	g_RenderTimer = new	GameTimer("Render");
+
+	g_UpdateTimer->Reset();
+	g_RenderTimer->Reset();
 
 	g_IsTearingSupported = app.IsTearingSupported();
 
@@ -171,56 +174,38 @@ void Window::RegisterCallbacks(std::shared_ptr<Game> pGame)
 	return;
 }
 
-void Window::CalculateFrameStatics(GameTimer& timer)
-{
-	static int frameCount = 0;
-	static float elapsedTime = 0.0;
-	//std::wstring s = std::to_wstring(timer.GetTotalTime()) + L"\n";
-	//OutputDebugString(s.c_str());
-	frameCount++;
-	if ((timer.GetTotalTime() - elapsedTime) >= 1.0f)
-	{
-		float fps = frameCount;
-		float framePeriod = (1 / fps) * 1000;
 
-		std::wstring text;
-		text += L"FPS: " + std::to_wstring(fps) + L"\n";
-		OutputDebugString(text.c_str());
-		text = L"";
-		text += L"FramePeriod: " + std::to_wstring(framePeriod) + L"\n";
-		OutputDebugString(text.c_str());
-
-		frameCount = 0;
-		elapsedTime += 1.0;
-
-	}
-}
 
 void Window::OnUpdate(UpdateEventArgs&)
 {
-	g_UpdateTimer.Tick();
-
+	g_UpdateTimer->Tick();
+	//OutputDebugString( std::to_wstring(g_UpdateTimer->GetDeltaTime()).c_str());
+	//OutputDebugString(L"Update\n");
 	if (auto pGame = g_pGame.lock())
 	{
-		CalculateFrameStatics(g_UpdateTimer);
+		g_UpdateTimer->CalculateFrameStatics();
 
-		UpdateEventArgs updateEventArgs(g_UpdateTimer.GetDeltaTime(), g_UpdateTimer.GetTotalTime());
+		UpdateEventArgs updateEventArgs(g_UpdateTimer->GetDeltaTime(), g_UpdateTimer->GetTotalTime());
 		pGame->OnUpdate(updateEventArgs);
 	}
+
 }
 
 void Window::OnRender(RenderEventArgs&)
 {
-	g_RenderTimer.Tick();
+	g_RenderTimer->Tick();
+	//OutputDebugString(std::to_wstring(g_RenderTimer->GetDeltaTime()).c_str());
+	//OutputDebugString(L"Render\n");
 
 	if (auto pGame = g_pGame.lock())
 	{
-		//CalculateFrameStatics(g_RenderTimer);
+		//g_RenderTimer->CalculateFrameStatics();
 
-
-		RenderEventArgs renderEventArgs(g_RenderTimer.GetDeltaTime(), g_RenderTimer.GetTotalTime());
+		RenderEventArgs renderEventArgs(g_RenderTimer->GetDeltaTime(), g_RenderTimer->GetTotalTime());
 		pGame->OnRender(renderEventArgs);
 	}
+
+
 }
 
 void Window::OnKeyPressed(KeyEventArgs& e)

@@ -168,7 +168,6 @@
   <ItemGroup>
     <ClInclude Include="Application.h" />
     <ClInclude Include="CommandQueue.h" />
-    <ClInclude Include="d3dApp.h" />
     <ClInclude Include="d3dx12.h" />
     <ClInclude Include="Events.h" />
     <ClInclude Include="Game.h" />
@@ -183,7 +182,6 @@
   <ItemGroup>
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="CommandQueue.cpp" />
-    <ClCompile Include="d3dApp.cpp" />
     <ClCompile Include="Directx12_HelloWorld.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="GameTimer.cpp" />

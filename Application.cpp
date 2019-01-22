@@ -1,9 +1,18 @@
+//imgui include files
+//#include "vendors/imgui/imgui.h"
+//#include "vendors/imgui/examples/imgui_impl_dx12.h"
+//#include "vendors/imgui/examples/imgui_impl_win32.h"
+
+
+
 #include "Application.h"
 #include"Helpers.h"
 #include"CommandQueue.h"
 #include"Window.h"
 #include"Game.h"
 #include<map>
+
+
 
 constexpr wchar_t WINDOW_CLASS_NAME[] = L"DX12";
 
@@ -53,7 +62,7 @@ Application::Application(HINSTANCE hInst) : g_hInstance(hInst),g_TearingSupporte
 		MessageBoxA(NULL, "Unable to register the window class.", "Error", MB_OK | MB_ICONERROR);
 	}
 
-	g_dxgiAdapter = GetAdapter(true);
+	g_dxgiAdapter = GetAdapter(false);
 	if (g_dxgiAdapter)
 	{
 		g_d3d12Device = CreateDevice(g_dxgiAdapter);
@@ -399,9 +408,14 @@ MouseButtonEventArgs::MouseButton DecodeMouseButton(UINT messageID)
 	return mouseButton;
 }
 
+//extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+	//
+	//if (ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam))
+	//	return true;
+
 	WindowPtr pWindow;
 	{
 		WindowsMap::iterator iter = gs_Windows.find(hwnd);

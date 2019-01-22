@@ -12,6 +12,11 @@ using namespace Microsoft::WRL;
 
 #include <algorithm>
 
+
+
+
+
+
 using namespace DirectX;
 
 
@@ -53,8 +58,8 @@ static WORD g_Indicies[36] =
 
 Tutorial2::Tutorial2(const std::wstring & name, int width, int height, bool vSync) :
 	super(name, width, height, vSync),
-	g_ScissorRect(CD3DX12_RECT(0, 0, LONG_MAX, LONG_MAX)),
 	g_Viewport(CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height))),
+	g_ScissorRect(CD3DX12_RECT(0, 0, LONG_MAX, LONG_MAX)),
 	g_FoV(45.0),
 	g_ContentLoaded(false)
 {
@@ -64,7 +69,7 @@ void Tutorial2::UpdateBufferResource(Microsoft::WRL::ComPtr<ID3D12GraphicsComman
 {
 	auto device = Application::Get().GetDevice();
 
-	size_t bufferSize = numElements * elementSize;
+	const size_t bufferSize = numElements * elementSize;
 	ThrowifFailed(device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,

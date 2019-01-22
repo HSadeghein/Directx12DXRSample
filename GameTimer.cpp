@@ -2,8 +2,9 @@
 #include <string>
 
 
-GameTimer::GameTimer() :mSecondsPerCount(0.0),mDeltaTime(-1.0),mBaseTime(0),mPausedTime(0),mPrevTime(0),mCurrTime(0),mStopped(false)
+GameTimer::GameTimer(std::string name) :mSecondsPerCount(0.0),mDeltaTime(-1.0),mBaseTime(0),mPausedTime(0),mPrevTime(0),mCurrTime(0),mStopped(false)
 {
+	mName = name;
 	__int64 countsPerSec;
 	QueryPerformanceFrequency((LARGE_INTEGER*)&countsPerSec);
 	mSecondsPerCount = 1 / (double)countsPerSec;
@@ -32,6 +33,29 @@ void GameTimer::Tick()
 
 	if (mDeltaTime < 0)
 		mDeltaTime = 0;
+}
+
+void GameTimer::CalculateFrameStatics()
+{
+	//static int frameCount = 0;
+	//static float elapsedTime = 0.0;
+	//frameCount++;
+	mFrameCount++;
+	if ((GetTotalTime() - mElapsedTime) >= 1.0f)
+	{
+		float fps = mFrameCount;
+		float framePeriod = (1 / fps) * 1000;
+
+		std::wstring text;
+		text += L"FPS: " + std::wstring(mName.begin(), mName.end()) + std::to_wstring(fps) + L"\n";
+		OutputDebugString(text.c_str());
+		text = L"";
+		text += L"FramePeriod: " + std::to_wstring(framePeriod) + L"\n";
+		OutputDebugString(text.c_str());
+
+		mFrameCount = 0;
+		mElapsedTime += 1.0;
+	}
 }
 
 float GameTimer::GetDeltaTime() const
