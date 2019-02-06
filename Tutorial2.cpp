@@ -5,12 +5,16 @@
 #include"CommandQueue.h"
 
 #include <wrl.h>
+#include "imgui/imgui.h"
+#include "imgui_impl_win32.h"
+#include "imgui_impl_dx12.h"
 using namespace Microsoft::WRL;
 
 #include "d3dx12.h"
 #include <d3dcompiler.h>
 
 #include <algorithm>
+#include<array>
 
 
 
@@ -65,6 +69,47 @@ Tutorial2::Tutorial2(const std::wstring & name, int width, int height, bool vSyn
 {
 }
 
+void Tutorial2::BuildBoxGeometry()
+{
+	std::array<VertexPosColor, 8> vertices =
+	{
+		VertexPosColor({ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, 0.0f) }),
+		VertexPosColor({ XMFLOAT3(-1.0f,  1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) }),
+		VertexPosColor({ XMFLOAT3(1.0f,  1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f) }),
+		VertexPosColor({ XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f) }),
+		VertexPosColor({ XMFLOAT3(-1.0f, -1.0f,  1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f) }),
+		VertexPosColor({ XMFLOAT3(-1.0f,  1.0f,  1.0f), XMFLOAT3(0.0f, 1.0f, 1.0f) }),
+		VertexPosColor({ XMFLOAT3(1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 1.0f) }),
+		VertexPosColor({ XMFLOAT3(1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 0.0f, 1.0f) })
+	};
+
+	std::array<std::uint16_t, 36> indices = 
+	{
+		0, 1, 2, 0, 2, 3,
+		4, 6, 5, 4, 7, 6,
+		4, 5, 1, 4, 1, 0,
+		3, 2, 6, 3, 6, 7,
+		1, 5, 6, 1, 6, 2,
+		4, 0, 3, 4, 3, 7
+	};
+
+	const UINT vbByteSize = sizeof(VertexPosColor) * (UINT)vertices.size();
+	const UINT ibByteSize = sizeof(std::uint16_t) * (UINT)indices.size();
+
+	g_MeshBox = std::make_unique<d3dUtil::MeshGeometry>();
+
+	g_MeshBox->Name = "Box";
+
+	ThrowifFailed(D3DCreateBlob(vbByteSize, &g_MeshBox->VertexBufferCPU));
+	CopyMemory(g_MeshBox->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+
+	ThrowifFailed(D3DCreateBlob(ibByteSize, &g_MeshBox->IndexBufferCPU));
+	CopyMemory(g_MeshBox->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+
+
+
+}
+
 void Tutorial2::UpdateBufferResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList, ID3D12Resource ** pDestinationResource, ID3D12Resource ** pIntermediateResource, size_t numElements, size_t elementSize, const void * bufferData, D3D12_RESOURCE_FLAGS flags)
 {
 	auto device = Application::Get().GetDevice();
@@ -99,11 +144,42 @@ void Tutorial2::UpdateBufferResource(Microsoft::WRL::ComPtr<ID3D12GraphicsComman
 	}
 }
 
+void Tutorial2::LoadImgui(HANDLE hWnd, ID3D12Device2* device)
+{
+	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	desc.NumDescriptors = 1;
+	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	ThrowifFailed(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&g_FontDSVHeap)));
+
+	// Setup Dear ImGui context
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
+
+	// Setup Dear ImGui style
+	ImGui::StyleColorsDark();
+	//ImGui::StyleColorsClassic();
+
+	// Setup Platform/Renderer bindings
+	ImGui_ImplWin32_Init(hWnd);
+	ImGui_ImplDX12_Init(device , super::g_pWindow->BufferCount,
+		DXGI_FORMAT_R8G8B8A8_UNORM,
+		g_FontDSVHeap->GetCPUDescriptorHandleForHeapStart(),
+		g_FontDSVHeap->GetGPUDescriptorHandleForHeapStart());
+
+}
+
 bool Tutorial2::LoadContent()
 {
 	auto device = Application::Get().GetDevice();
 	auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY);
 	auto commandList = commandQueue->GetCommandList();
+
+	//LoadImgui
+	LoadImgui(super::g_pWindow->GetWindowHandle(), device.Get());
+
 
 	// Upload vertex buffer data.
 	ComPtr<ID3D12Resource> intermediateVertexBuffer;
@@ -291,7 +367,7 @@ void Tutorial2::OnUpdate(UpdateEventArgs& e)
 
 
 	// Update the model matrix.
-	float angle = static_cast<float>(e.TotalTime * 90.0);
+	float angle = static_cast<float>(e.TotalTime * 10);
 	const XMVECTOR rotationAxis = XMVectorSet(0, 1, 1, 0);
 	g_ModelMatrix = XMMatrixRotationAxis(rotationAxis, XMConvertToRadians(angle));
 
@@ -303,7 +379,7 @@ void Tutorial2::OnUpdate(UpdateEventArgs& e)
 
 	// Update the projection matrix.
 	float aspectRatio = super::g_pWindow->GetClientWidth() / static_cast<float>(super::g_pWindow->GetClientHeight());
-	g_ProjectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(g_FoV), aspectRatio, 0.1f, 100.0f);
+	g_ProjectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(g_FoV), aspectRatio, 0.001f, 1000.0f);
 }
 
 // Transition a resource
@@ -334,6 +410,23 @@ void Tutorial2::ClearDepth(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> co
 void Tutorial2::OnRender(RenderEventArgs& e)
 {
 	super::OnRender(e);
+
+	
+
+	ImGui_ImplDX12_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+	
+	ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+
+	if(ImGui::Button("Button", ImVec2(50, 50)))
+	ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+	ImGui::End();
+
+
+
+
 
 	auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
 	auto commandList = commandQueue->GetCommandList();
@@ -372,6 +465,17 @@ void Tutorial2::OnRender(RenderEventArgs& e)
 	commandList->SetGraphicsRoot32BitConstants(0, sizeof(XMMATRIX) / 4, &mvpMatrix, 0);
 
 	commandList->DrawIndexedInstanced(_countof(g_Indicies), 1, 0, 0, 0);
+
+
+
+	//commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+
+
+	ID3D12DescriptorHeap* const x = g_FontDSVHeap.Get();
+	commandList->SetDescriptorHeaps(1, &x);
+	ImGui::Render();
+	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList.Get());
 
 	// Present
 	{

@@ -1,7 +1,7 @@
 //imgui include files
-//#include "vendors/imgui/imgui.h"
-//#include "vendors/imgui/examples/imgui_impl_dx12.h"
-//#include "vendors/imgui/examples/imgui_impl_win32.h"
+#include "imgui/imgui.h"
+#include "imgui_impl_dx12.h"
+#include "imgui_impl_win32.h"
 
 
 
@@ -254,6 +254,7 @@ std::shared_ptr<Window> Application::CreateRenderWindow(std::wstring & windowNam
 	gs_Windows.insert(WindowsMap::value_type(hWnd, pWindow));
 	gs_WindowByName.insert(WindowNameMap::value_type(windowName, pWindow));
 
+
 	return pWindow;
 }
 
@@ -284,12 +285,11 @@ std::shared_ptr<Window> Application::GetWindowByName(const std::wstring & window
 }
 int Application::Run(std::shared_ptr<Game> pGame)
 {
-	
 	if (!pGame->Initialize()) return 1;
 	if (!pGame->LoadContent()) return 2;
 
 	MSG msg = { 0 };
-
+	ZeroMemory(&msg, sizeof(msg));
 	while (msg.message != WM_QUIT)
 	{
 		if (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
@@ -300,6 +300,10 @@ int Application::Run(std::shared_ptr<Game> pGame)
 	}
 
 	Flush();
+
+	ImGui_ImplDX12_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
 
 	pGame->UnloadContent();
 	pGame->Destroy();
@@ -408,13 +412,13 @@ MouseButtonEventArgs::MouseButton DecodeMouseButton(UINT messageID)
 	return mouseButton;
 }
 
-//extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	//
-	//if (ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam))
-	//	return true;
+	
+	if (ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam))
+		return true;
 
 	WindowPtr pWindow;
 	{

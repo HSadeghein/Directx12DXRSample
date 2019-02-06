@@ -2,7 +2,7 @@
 #include "Game.h"
 #include "Window.h"
 #include <DirectXMath.h>
-
+#include"d3dUtil.h"
 class Tutorial2 : public Game
 {
 public:
@@ -63,6 +63,9 @@ protected:
 	virtual void OnResize(ResizeEventArgs& e) override;
 
 private:
+
+	void LoadImgui(HANDLE hWnd, ID3D12Device2* device);
+
 	void TransitionResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
 		Microsoft::WRL::ComPtr<ID3D12Resource> resource, D3D12_RESOURCE_STATES beforeState,
 		D3D12_RESOURCE_STATES afterState);
@@ -79,6 +82,8 @@ private:
 
 	void ResizeDepthBuffer(int width, int height);
 
+	void BuildBoxGeometry();
+
 	uint64_t g_FenceValues[Window::BufferCount] = {};
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> g_VertexBuffer;
@@ -92,6 +97,9 @@ private:
 	// Descriptor heap for depth buffer.
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> g_DSVHeap;
 
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> g_FontDSVHeap;
+
+
 	// Root signature
 	// The root signature describes the parameters passed to the various stages of the rendering pipeline
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> g_RootSignature;
@@ -99,6 +107,7 @@ private:
 	// Pipeline state object.
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> g_PipelineState;
 
+	//For the initializing the rasterizer
 	D3D12_VIEWPORT g_Viewport;
 	D3D12_RECT g_ScissorRect;
 
@@ -109,6 +118,8 @@ private:
 	DirectX::XMMATRIX g_ProjectionMatrix;
 
 	bool g_ContentLoaded;
+
+	std::unique_ptr<d3dUtil::MeshGeometry> g_MeshBox;
 
 
 };

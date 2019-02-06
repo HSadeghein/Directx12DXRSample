@@ -112,7 +112,7 @@ private:
 	GameTimer *g_RenderTimer;
 
 
-	uint64_t g_FrameCounter;
+	//uint64_t g_FrameCounter;
 
 	std::weak_ptr<Game> g_pGame;
 
