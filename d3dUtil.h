@@ -5,6 +5,7 @@
 #include<string>
 #include<map>
 #include<unordered_map>
+#include<d3dcompiler.h>
 #include"Helpers.h"
 #include"d3dx12.h"
 namespace d3dUtil {
@@ -105,7 +106,7 @@ namespace d3dUtil {
 		UpdateSubresources<1>(commandList, defaultBuffer.Get(), uploadBuffer.Get(), 0, 0, 1, &subResourceData);
 
 		commandList->ResourceBarrier(1,
-			&CD3DX12_RESOURCE_BARRIER::Transition(defaultBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
+			&CD3DX12_RESOURCE_BARRIER::Transition(defaultBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON));
 
 
 		return defaultBuffer;
@@ -114,5 +115,31 @@ namespace d3dUtil {
 	inline UINT CalcConstantBufferByteSize(UINT byteSize)
 	{
 		return (byteSize + 255) & ~255;
+	}
+
+	inline Microsoft::WRL::ComPtr<ID3DBlob> CompileShader(
+		const std::wstring& filename,
+		const D3D_SHADER_MACRO* defines,
+		const std::string& entrypoint,
+		const std::string& target)
+	{
+		UINT compileFlags = 0;
+#if defined(DEBUG) || defined(_DEBUG)  
+		compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#endif
+
+		HRESULT hr = S_OK;
+
+		Microsoft::WRL::ComPtr<ID3DBlob> byteCode = nullptr;
+		Microsoft::WRL::ComPtr<ID3DBlob> errors;
+		hr = D3DCompileFromFile(filename.c_str(), defines, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+			entrypoint.c_str(), target.c_str(), compileFlags, 0, &byteCode, &errors);
+
+		if (errors != nullptr)
+			OutputDebugStringA((char*)errors->GetBufferPointer());
+
+		ThrowifFailed(hr);
+
+		return byteCode;
 	}
 }
