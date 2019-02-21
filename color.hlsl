@@ -51,5 +51,6 @@ VertexOut vertex(VertexIn vin)
 
 float4 pixel(VertexOut pin) : SV_Target
 {
-    return pin.WorldPos;
+    float x = sin(gTotalTime);
+    return pin.WorldPos * x;
 }
