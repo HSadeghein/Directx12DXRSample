@@ -263,7 +263,7 @@ void Tutorial2::BuildRootSignature()
 		D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
 		D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
 		D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-		D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_STREAM_OUTPUT;
 
 	CD3DX12_DESCRIPTOR_RANGE cbvTable0;
 	cbvTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
@@ -460,7 +460,7 @@ void Tutorial2::BuildShapeGeometry(ID3D12GraphicsCommandList* commandList)
 	auto device = Application::Get().GetDevice();
 
 	GeometryGenerator geoGen;
-	GeometryGenerator::MeshData box = geoGen.CreateBox(1.5f, 0.5f, 1.5f, 3);
+	GeometryGenerator::MeshData box = geoGen.CreateBox(1.5f, 2.0f, 1.5f, 3);
 	GeometryGenerator::MeshData grid = geoGen.CreateGrid(20.0f, 30.0f, 60, 40);
 	GeometryGenerator::MeshData sphere = geoGen.CreateSphere(0.5f, 20, 20);
 	GeometryGenerator::MeshData cylinder = geoGen.CreateCylinder(0.5f, 0.3f, 3.0f, 20, 20);
@@ -897,7 +897,10 @@ void Tutorial2::OnRender(RenderEventArgs& e)
 	
 	ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
 
-	if(ImGui::Button("Button", ImVec2(50, 50)))
+	if (ImGui::Button("WireFrameMode", ImVec2(150, 50))) 
+	{
+		isWireFrameMode = !isWireFrameMode;
+	}
 	ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 	ImGui::End();
@@ -916,7 +919,10 @@ void Tutorial2::OnRender(RenderEventArgs& e)
 
 	commandList->RSSetViewports(1, &g_Viewport);
 	commandList->RSSetScissorRects(1, &g_ScissorRect);
-	commandList->SetPipelineState(g_PSOs["opaque"].Get());
+	if(isWireFrameMode)
+		commandList->SetPipelineState(g_PSOs["opaque_wireframe"].Get());
+	else
+		commandList->SetPipelineState(g_PSOs["opaque"].Get());
 	// Clear the render targets.
 	{
 		TransitionResource(commandList, backBuffer,
@@ -1013,8 +1019,8 @@ void Tutorial2::OnMouseMoved(MouseMotionEventArgs & e)
 		float dy = XMConvertToRadians(0.25f*static_cast<float>(e.Y - mLastMousePos.y));
 
 		// Update angles based on input to orbit camera around box.
-		mTheta += dx;
-		mPhi += dy;
+		mTheta -= dx;
+		mPhi -= dy;
 
 		// Restrict the angle mPhi.
 		mPhi = MathHelper::Clamp(mPhi, 0.1f, DirectX::XM_PI - 0.1f);
@@ -1026,7 +1032,7 @@ void Tutorial2::OnMouseMoved(MouseMotionEventArgs & e)
 		float dy = 0.05f*static_cast<float>(e.Y - mLastMousePos.y);
 
 		// Update the camera radius based on input.
-		mRadius += dx - dy;
+		mRadius -= dx - dy;
 
 		// Restrict the radius.
 		mRadius = MathHelper::Clamp(mRadius, 5.0f, 150.0f);

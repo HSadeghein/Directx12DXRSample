@@ -201,5 +201,7 @@ private:
 	float mPhi = 0.2f*DirectX::XM_PI;
 	float mRadius = 15.0f;
 
+	bool isWireFrameMode = false;
+
 };
 
