@@ -9,7 +9,7 @@
 .user
 .userosscache
 .sln.docstates
-.gif
+*.gif
 # User-specific files (MonoDevelopXamarin Studio)
 .userprefs
 
