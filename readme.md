@@ -14,25 +14,22 @@ The source code of **Fallback Layer** has been added if you want to see, but if 
     * **$(ProjectDir)FallbackLayer\Include**
     * **$(IntDir)**
     * **$(ProjectDir)Packages**
-<br/>
 * Add following directories to Linker -> General -> Additional Linker Directories
     * **$(ProjectDir)FallbackLayer**
     * **$(ProjectDir)Packages\WinPixEventRuntime.1.0.180612001\bin**
-<br/>
 * Add following directories to Linker -> Input -> Additional Dependencies
-    * **d3d12.lib
-        dxgi.lib
-        pathcch.lib
-        D3DCompiler.lib
-        WinPixEventRuntime.lib
-        FallbackLayer.lib**
-<br/>
+    * **d3d12.lib**
+    * **dxgi.lib**
+    * **pathcch.lib**
+    * **D3DCompiler.lib**
+    * **WinPixEventRuntime.lib**
+    * **FallbackLayer.lib**
 * Add following code to Build Events -> Post-Build Event -> Command Line
     *  **`xcopy "$(ProjectDir)color.hlsl" "$(TargetDir)" /Y`**
-        **`xcopy "$(ProjectDir)FallbackLayer\dxrfallbackcompiler.dll" "$(TargetDir)" /Y`**
-        **`xcopy "$(ProjectDir)FallbackLayer\WinPixEventRuntime.dll" "$(TargetDir)" /Y`**
-        **`xcopy "$(ProjectDir)Additional DLLs\d3dcompiler_47.dll" "$(TargetDir)" /Y`**
-        **`xcopy "$(ProjectDir)Additional DLLs\dxil.dll" "$(TargetDir)" /Y`**
-        **`xcopy "$(ProjectDir)Additional DLLs\dxcompiler.dll" "$(TargetDir)" /Y `**
+    *  **`xcopy "$(ProjectDir)FallbackLayer\dxrfallbackcompiler.dll" "$(TargetDir)" /Y`**
+    *  **`xcopy "$(ProjectDir)FallbackLayer\WinPixEventRuntime.dll" "$(TargetDir)" /Y`**
+    *  **`xcopy "$(ProjectDir)Additional DLLs\d3dcompiler_47.dll" "$(TargetDir)" /Y`**
+    *  **`xcopy "$(ProjectDir)Additional DLLs\dxil.dll" "$(TargetDir)" /Y`**
+    *  **`xcopy "$(ProjectDir)Additional DLLs\dxcompiler.dll" "$(TargetDir)" /Y `**
 ### Showcase
 ![](sample.gif)
