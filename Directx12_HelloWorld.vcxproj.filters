@@ -167,6 +167,7 @@
     <None Include="imgui\.travis.yml" />
     <None Include="imgui\.editorconfig" />
     <None Include="readme.md" />
+    <None Include=".gitignore" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="sample.gif" />

@@ -254,6 +254,7 @@ xcopy "$(ProjectDir)Additional DLLs\dxcompiler.dll" "$(TargetDir)" /Y</Command>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include=".gitignore" />
     <None Include="imgui\.editorconfig" />
     <None Include="imgui\.travis.yml" />
     <None Include="readme.md" />
