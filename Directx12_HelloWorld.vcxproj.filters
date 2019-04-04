@@ -47,9 +47,6 @@
     <ClInclude Include="Tutorial1.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Tutorial2.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="imgui_impl_dx12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -95,6 +92,9 @@
     <ClInclude Include="Raytracing.hlsl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DXRSample.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -119,9 +119,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Tutorial1.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Tutorial2.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="imgui_impl_dx12.cpp">
@@ -149,6 +146,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="imgui\imgui.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DXRSample.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
