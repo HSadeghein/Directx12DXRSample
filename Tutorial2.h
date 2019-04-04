@@ -1,4 +1,6 @@
 #pragma once
+
+
 #include "Game.h"
 #include "Window.h"
 #include <DirectXMath.h>
@@ -9,8 +11,34 @@
 #include"FrameResource.h"
 #include <d3dcompiler.h>
 #include <d3dcommon.h>
+#include <minwindef.h>
+//FallbackLayer
+#include <D3D12RaytracingFallback.h>
+#include <DXRHelpers/DXSampleHelper.h>
+#include <DXRHelpers/DirectXRaytracingHelper.h>
+#include <D3D12RaytracingHelpers.hpp>
+
 
 #define NUMBER_OF_FRAME_RESOURCES 3
+
+
+namespace GlobalRootSignatureParams {
+	enum Value {
+		OutputViewSlot = 0,
+		AccelerationStructureSlot,
+		Count
+	};
+}
+
+namespace LocalRootSignatureParams {
+	enum Value {
+		ViewportConstantSlot = 0,
+		Count
+	};
+}
+using namespace Microsoft::WRL;
+
+
 
 
 struct VertexPosColor
@@ -52,14 +80,20 @@ public:
 
 	virtual void UnloadContent() override;
 
+
 	void BuildConstantBufferViews();
 	void BuildRootSignature();
 	void BuildShadersAndInputLayout();
 	void BuildRenderItems();
+	void CreateRaytracingDeviceDependentResources();
 	void BuildShapeGeometry(ID3D12GraphicsCommandList* commandList);
+	void BuildTriangle(ID3D12GraphicsCommandList* commandList);
+	void BuildRenderTriangleItem();
 	void BuildPSOs();
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 	void BuildFrameResources();
+	void DoRaytracing(ID3D12GraphicsCommandList * commandList);
+	void UpdateForSizeChange(UINT width, UINT height);
 	void UpdateObjectCBs();
 	void UpdateMainPassCB(UpdateEventArgs& e);
 	
@@ -105,10 +139,13 @@ protected:
 	 */
 	virtual void OnMouseWheel(MouseWheelEventArgs& e) override;
 
+	void CreateRaytracingWindowSizeDependentResources();
+
 	/**
 	 * Invoked when the attached window is resized.
 	 */
 	virtual void OnResize(ResizeEventArgs& e) override;
+
 
 private:
 	void CreateDescriptorHeaps(ID3D12Device* device);
@@ -130,7 +167,20 @@ private:
 		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
 
 	void ResizeDepthBuffer(int width, int height);
+	void CreateRaytracingDeviceCommandlist();
+	void CreateRaytracingOutputResource();
+	void BuildShaderTables();
+	void CreateRaytracingRootSignatures();
+	void SerializeAndCreateRaytracingRootSignature(D3D12_ROOT_SIGNATURE_DESC & desc, ComPtr<ID3D12RootSignature>* rootSig);
+	void CreateRaytracingPipelineStateObject();
+	void CreateLocalRootSignatureSubobjects(CD3D12_STATE_OBJECT_DESC * raytracingPipeline);
+	void BuildAccelerationStructures();
+	void CopyRaytracingOutputToBackbuffer(ID3D12GraphicsCommandList * commandList);
+	WRAPPED_GPU_POINTER CreateFallbackWrappedPointer(ID3D12Resource * resource, UINT bufferNumElements);
+	UINT AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE * cpuDescriptor, UINT descriptorIndexToUse = UINT_MAX);
+	void ReleaseWindowSizeDependentResource();
 
+	void ReleaseDeviceDependentResource();
 
 	uint64_t g_FenceValues[Window::BufferCount] = {};
 
@@ -161,6 +211,47 @@ private:
 	std::vector<D3D12_INPUT_ELEMENT_DESC> g_InputLayout;
 
 
+	//FallBackLayer
+	ComPtr<ID3D12RaytracingFallbackDevice> g_fallbackDevice;
+	ComPtr<ID3D12RaytracingFallbackCommandList> g_fallbackCommandList;
+	ComPtr<ID3D12RaytracingFallbackStateObject> g_fallbackStateObject;
+	WRAPPED_GPU_POINTER g_fallbackTopLevelAccelerationStructrePointer;
+
+	//Directx Raytracing ==> DXR
+	ComPtr<ID3D12Device5> g_dxrDevice;
+	ComPtr<ID3D12GraphicsCommandList4> g_dxrCommandList;
+	ComPtr<ID3D12StateObjectPrototype> g_dxrStateObject;
+	bool g_isDxrSupported;
+
+	//Raytracing Root Signatures
+	ComPtr<ID3D12RootSignature> g_raytracingGlobalRootSignature;
+	ComPtr<ID3D12RootSignature> g_raytracingLocalRootSignature;
+
+	RayGenConstantBuffer g_rayGenCB;
+
+	//Acceleration Structure
+	ComPtr<ID3D12Resource> g_accelerationStructure;
+	ComPtr<ID3D12Resource> g_topLevelAccelerationStructure;
+	ComPtr<ID3D12Resource> g_bottomLevelAccelerationStructure;
+
+	//Raytracing Output
+	ComPtr<ID3D12Resource> g_raytracingOutput;
+	D3D12_GPU_DESCRIPTOR_HANDLE g_raytracingOutputResourceUAVGpuDescriptor;
+	UINT g_raytracingOutputResourceUAVDescriptorHeapIndex;
+
+	// Shader tables
+	static const wchar_t* c_hitGroupName;
+	static const wchar_t* c_raygenShaderName;
+	static const wchar_t* c_closestHitShaderName;
+	static const wchar_t* c_missShaderName;
+	ComPtr<ID3D12Resource> m_missShaderTable;
+	ComPtr<ID3D12Resource> m_hitGroupShaderTable;
+	ComPtr<ID3D12Resource> m_rayGenShaderTable;
+
+
+	RaytracingAPI g_raytracingAPI = RaytracingAPI::FallbackLayer;
+	bool g_forceComputeFallback;
+
 	//For the initializing the rasterizer
 	D3D12_VIEWPORT g_Viewport;
 	D3D12_RECT g_ScissorRect;
@@ -188,6 +279,8 @@ private:
 
 	UINT g_PassCBVOffset = 0;
 	UINT g_ObjectCBVOffset = 0;
+	UINT g_RaytracingCBVOffset = 0;
+	UINT g_RaytracingDescriptorsAllocated = 0;
 
 	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D12PipelineState>> g_PSOs;
 	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3DBlob>> g_Shaders;
@@ -202,6 +295,7 @@ private:
 	float mRadius = 15.0f;
 
 	bool isWireFrameMode = false;
+	bool g_raster = false;
 
 };
 

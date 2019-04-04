@@ -82,6 +82,11 @@ void Game::OnResize(ResizeEventArgs& e)
 {
 	g_Width = e.Width;
 	g_Height = e.Height;
+	g_aspectRatio = static_cast<float>(g_Width) / static_cast<float>(g_Height);
+
+	g_pWindow->g_ClientHeight = g_Height;
+	g_pWindow->g_ClientWidth = g_Width;
+
 }
 
 void Game::OnWindowDestroy()
@@ -100,4 +105,9 @@ int Game::GetWidth() const
 int Game::GetHeight() const
 {
 	return g_Height;
+}
+
+float Game::GetAspectRatio() const
+{
+	return g_aspectRatio;
 }

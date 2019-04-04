@@ -76,11 +76,13 @@ protected:
 
 	int GetWidth() const;
 	int GetHeight() const;
+	float GetAspectRatio() const;
 
 private:
 	std::wstring g_Name;
 	int g_Width;
 	int g_Height;
+	float g_aspectRatio;
 	bool g_vSync;
 };
 

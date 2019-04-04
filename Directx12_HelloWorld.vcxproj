@@ -23,7 +23,7 @@
     <ProjectGuid>{8D5AAFD2-368B-4BA8-9293-4B934612695C}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>Directx12HelloWorld</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -113,8 +113,7 @@
       <ConformanceMode>false</ConformanceMode>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>
-      </AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)FallbackLayer\Include;$(IntDir);$(ProjectDir)Packages;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <SupportJustMyCode>false</SupportJustMyCode>
       <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
@@ -124,7 +123,8 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;pathcch.lib;D3DCompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;pathcch.lib;D3DCompiler.lib;WinPixEventRuntime.lib;FallbackLayer.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)FallbackLayer;$(ProjectDir)Packages\WinPixEventRuntime.1.0.180612001\bin;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <FxCompile>
       <ShaderModel>5.1</ShaderModel>
@@ -195,8 +195,10 @@
     <ClInclude Include="imgui_impl_dx12.h" />
     <ClInclude Include="imgui_impl_win32.h" />
     <ClInclude Include="KeyCodes.h" />
+    <ClInclude Include="Material.h" />
     <ClInclude Include="MathHelper.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="Raytracing.hlsl.h" />
     <ClInclude Include="Tutorial1.h" />
     <ClInclude Include="Tutorial2.h" />
     <ClInclude Include="UploadBuffer.h" />
@@ -216,6 +218,7 @@
     <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="imgui_impl_dx12.cpp" />
     <ClCompile Include="imgui_impl_win32.cpp" />
+    <ClCompile Include="Material.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -248,6 +251,10 @@
   <ItemGroup>
     <None Include="imgui\.editorconfig" />
     <None Include="imgui\.travis.yml" />
+    <None Include="readme.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="sample.gif" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

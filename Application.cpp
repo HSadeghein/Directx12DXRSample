@@ -11,7 +11,7 @@
 #include"Window.h"
 #include"Game.h"
 #include<map>
-
+#include<fstream>
 
 
 constexpr wchar_t WINDOW_CLASS_NAME[] = L"DX12";
@@ -120,6 +120,7 @@ Microsoft::WRL::ComPtr<IDXGIAdapter4> Application::GetAdapter(bool bUseWarp)
 	ThrowifFailed(CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&dxgiFactory)));
 
 	Microsoft::WRL::ComPtr<IDXGIAdapter1> dxgiAdapter1;
+	Microsoft::WRL::ComPtr<IDXGIAdapter1> dxgiAdapterTemp1;
 	Microsoft::WRL::ComPtr<IDXGIAdapter4> dxgiAdapter4;
 	if (bUseWarp)
 	{
@@ -128,6 +129,7 @@ Microsoft::WRL::ComPtr<IDXGIAdapter4> Application::GetAdapter(bool bUseWarp)
 	}
 	else
 	{
+		std::wofstream outputFile("AdaptersInfo.txt");
 		SIZE_T maxDedicatedVideoMemory = 0;
 		for (UINT i = 0; dxgiFactory->EnumAdapters1(i, &dxgiAdapter1) != DXGI_ERROR_NOT_FOUND; ++i)
 		{
@@ -144,9 +146,23 @@ Microsoft::WRL::ComPtr<IDXGIAdapter4> Application::GetAdapter(bool bUseWarp)
 			{
 				maxDedicatedVideoMemory = dxgiAdapterDesc1.DedicatedVideoMemory;
 				ThrowifFailed(dxgiAdapter1.As(&dxgiAdapter4));
+				dxgiAdapterTemp1 = dxgiAdapter1;
+				if (EnableComputeRaytracingFallback(dxgiAdapter1.Get()))
+					outputFile << dxgiAdapterDesc1.Description << " ==> Supports Fallback Layer" << std::endl;
+				else
+					outputFile << dxgiAdapterDesc1.Description << " ==> Does not Support Fallback Layer" << std::endl;
+				if(IsDirectXRaytracingSupported(dxgiAdapter1.Get()))
+					outputFile << dxgiAdapterDesc1.Description << " ==> Supports DXR" << std::endl;
+				else
+					outputFile << dxgiAdapterDesc1.Description << " ==> Does not Support DXR" << std::endl;
 			}
 		}
+		outputFile.close();
 	}
+	if (EnableComputeRaytracingFallback(dxgiAdapterTemp1.Get()))
+		isFallbackSupported = true;
+	if (IsDirectXRaytracingSupported(dxgiAdapterTemp1.Get()))
+		isDXRSupported = true;
 	return dxgiAdapter4;
 }
 
@@ -347,6 +363,30 @@ void Application::Flush()
 	g_DirectCommandQueue->Flush();
 	g_ComputeCommandQueue->Flush();
 	g_CopyCommandQueue->Flush();
+}
+
+bool Application::EnableComputeRaytracingFallback(IDXGIAdapter1 * adapter)
+{
+	Microsoft::WRL::ComPtr<ID3D12Device> testDevice;
+	UUID experimentalFeatures[] = { D3D12ExperimentalShaderModels };
+
+	return SUCCEEDED(D3D12EnableExperimentalFeatures(1, experimentalFeatures, nullptr, nullptr))
+		&& SUCCEEDED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&testDevice)));
+}
+
+bool Application::IsDirectXRaytracingSupported(IDXGIAdapter1 * adapter)
+{
+	Microsoft::WRL::ComPtr<ID3D12Device> testDevice;
+	D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData = {};
+
+	return SUCCEEDED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&testDevice)))
+		&& SUCCEEDED(testDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData)))
+		&& featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+}
+
+Microsoft::WRL::ComPtr<IDXGIAdapter4> Application::GetAdapter()
+{
+	return g_dxgiAdapter;
 }
 
 Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> Application::CreateDescriptorHeap(UINT numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type)

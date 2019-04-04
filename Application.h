@@ -54,9 +54,14 @@ public:
 	void Flush();
 
 
+	Microsoft::WRL::ComPtr<IDXGIAdapter4> GetAdapter();
+
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(UINT numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type);
 	UINT GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE type) const;
 
+
+	bool isFallbackSupported = false;
+	bool isDXRSupported = false;
 protected:
 
 	// Create an application instance.
@@ -64,6 +69,8 @@ protected:
 	// Destroy the application instance and all windows associated with this application.
 	virtual ~Application();
 
+	bool EnableComputeRaytracingFallback(IDXGIAdapter1* adapter);
+	bool IsDirectXRaytracingSupported(IDXGIAdapter1* adapter);
 	Microsoft::WRL::ComPtr<IDXGIAdapter4> GetAdapter(bool bUseWarp);
 	Microsoft::WRL::ComPtr<ID3D12Device2> CreateDevice(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter);
 	bool CheckTearingSupport();
