@@ -14,6 +14,7 @@ namespace d3dUtil {
 	struct SubmeshGeometry
 	{
 		UINT IndexCount = 0;
+		UINT VertexCount = 0;
 		UINT StartIndexLocation = 0;
 
 		INT StartVertexLocation = 0;

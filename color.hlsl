@@ -8,6 +8,7 @@ cbuffer cbPass : register(b1)
     float4x4 gView;
     float4x4 gInvView;
     float4x4 gProj;
+	float4x4 gProjToWorld;
     float4x4 gInvProj;
     float4x4 gViewProj;
     float4x4 gInvViewProj;
@@ -20,7 +21,13 @@ cbuffer cbPass : register(b1)
     float gTotalTime;
     float gDeltaTime;
 };
-
+cbuffer cbMaterial : register(b2)
+{
+	float4 gDiffuseAlbedo;
+	float3 gFresnelR0;
+	float  gRoughness;
+	float4x4 gMatTransform;
+};
 struct VertexIn
 {
     float3 PosL : POSITION;
@@ -44,7 +51,7 @@ VertexOut vertex(VertexIn vin)
     vout.PosH = mul(posW, gViewProj);
 	
 	// Just pass vertex color into the pixel shader.
-    vout.Color = vin.Color;
+    vout.Color = float4(vin.PosL,1.0f);
     
     return vout;
 }
@@ -52,5 +59,5 @@ VertexOut vertex(VertexIn vin)
 float4 pixel(VertexOut pin) : SV_Target
 {
     float x = sin(gTotalTime);
-    return pin.WorldPos * x;
+    return pin.Color ;
 }

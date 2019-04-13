@@ -9,6 +9,8 @@
 #include"MathHelper.h"
 #include"GeometryGenerator.h"
 #include"FrameResource.h"
+#include"Material.h"
+#include "Shaders/RayTracingHlslCompat.h"
 #include <d3dcompiler.h>
 #include <d3dcommon.h>
 #include <minwindef.h>
@@ -22,17 +24,26 @@
 #define NUMBER_OF_FRAME_RESOURCES 3
 
 
-namespace GlobalRootSignatureParams {
+namespace RaytraceGlobalRootSignatureParams {
 	enum Value {
 		OutputViewSlot = 0,
 		AccelerationStructureSlot,
+		ScenceConstantBufferSlot,
 		Count
 	};
 }
 
-namespace LocalRootSignatureParams {
+namespace RaytraceLocalRootSignatureParams {
 	enum Value {
 		ViewportConstantSlot = 0,
+		Count
+	};
+}
+namespace RasterRootSignatureParam {
+	enum Value {
+		ObjectCB = 0,
+		PassCB,
+		MaterialCB,
 		Count
 	};
 }
@@ -56,6 +67,7 @@ struct RenderItem
 
 	UINT ObjCBIndex = -1;
 
+	Material* Mat = nullptr;
 	d3dUtil::MeshGeometry* Geo = nullptr;
 
 	// Primitive topology.
@@ -90,12 +102,15 @@ public:
 	void BuildTriangle(ID3D12GraphicsCommandList* commandList);
 	void BuildRenderTriangleItem();
 	void BuildPSOs();
+	void BuildMaterials();
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 	void BuildFrameResources();
 	void DoRaytracing(ID3D12GraphicsCommandList * commandList);
 	void UpdateForSizeChange(UINT width, UINT height);
 	void UpdateObjectCBs();
 	void UpdateMainPassCB(UpdateEventArgs& e);
+
+	void UpdateMaterialCB(UpdateEventArgs& e);
 	
 protected:
 	/**
@@ -138,6 +153,10 @@ protected:
 	 * Invoked when the mouse wheel is scrolled while the registered window has focus.
 	 */
 	virtual void OnMouseWheel(MouseWheelEventArgs& e) override;
+
+	void EnableDXR(IDXGIAdapter1* adapter);
+
+
 
 	void CreateRaytracingWindowSizeDependentResources();
 
@@ -222,7 +241,7 @@ private:
 	ComPtr<ID3D12GraphicsCommandList4> g_dxrCommandList;
 	ComPtr<ID3D12StateObjectPrototype> g_dxrStateObject;
 	bool g_isDxrSupported;
-
+	bool g_isFallbackSupported;
 	//Raytracing Root Signatures
 	ComPtr<ID3D12RootSignature> g_raytracingGlobalRootSignature;
 	ComPtr<ID3D12RootSignature> g_raytracingLocalRootSignature;
@@ -284,7 +303,7 @@ private:
 
 	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D12PipelineState>> g_PSOs;
 	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3DBlob>> g_Shaders;
-
+	std::unordered_map<std::string, std::unique_ptr<Material>> g_Materials;
 	PassConstants g_MainPassCB;
 	POINT mLastMousePos;
 	DirectX::XMFLOAT3 mEyePos = { 0.0f, 0.0f, 0.0f };
@@ -295,7 +314,7 @@ private:
 	float mRadius = 15.0f;
 
 	bool isWireFrameMode = false;
-	bool g_raster = false;
+	bool g_raster = true;
 
 };
 

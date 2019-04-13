@@ -89,11 +89,14 @@
     <ClInclude Include="Material.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Raytracing.hlsl.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="DXRSample.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Shaders\HlslCompat.h">
+      <Filter>Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="Shaders\RayTracingHlslCompat.h">
+      <Filter>Shaders</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -159,7 +162,7 @@
     <FxCompile Include="PixelShader.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="color.hlsl">
+    <FxCompile Include="Shaders\Raytracing.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>
@@ -171,5 +174,10 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="sample.gif" />
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="color.hlsl">
+      <Filter>Shaders</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
 </Project>

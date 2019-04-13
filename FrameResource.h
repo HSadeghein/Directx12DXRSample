@@ -2,6 +2,7 @@
 #include<d3d12.h>
 #include<wrl.h>
 #include<memory>
+#include <DirectXMath.h>
 #include"UploadBuffer.h"
 #include "MathHelper.h"
 #include"Helpers.h"
@@ -15,6 +16,7 @@ struct PassConstants
 	DirectX::XMFLOAT4X4 View = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 InvView = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 Proj = MathHelper::Identity4x4();
+	DirectX::XMFLOAT4X4 ProjToWorld = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 InvProj = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 ViewProj = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 InvViewProj = MathHelper::Identity4x4();
@@ -27,6 +29,15 @@ struct PassConstants
 	float TotalTime = 0.0f;
 	float DeltaTime = 0.0f;
 };
+
+struct MaterialConstants
+{
+	DirectX::XMFLOAT4 DiffuseAlbedo = { 1.0f,1.0f,1.0f,1.0f };
+	DirectX::XMFLOAT3 FresnelR0 = { 0.01f,0.01f,0.01f };
+	float Roughness = 0.25f;
+
+	DirectX::XMFLOAT4X4 MatTransform = MathHelper::Identity4x4();
+};
 struct FrameResource
 {
 	FrameResource(ID3D12Device* device, UINT passCount, UINT objectCount);
@@ -38,6 +49,7 @@ struct FrameResource
 
 	std::unique_ptr<UploadBuffer<ObjectConstants>> ObjectCB = nullptr;
 	std::unique_ptr<UploadBuffer<PassConstants>> PassCB = nullptr;
+	std::unique_ptr<UploadBuffer<MaterialConstants>> MaterialCB = nullptr;
 
 	UINT64 FenceValue;
 };
