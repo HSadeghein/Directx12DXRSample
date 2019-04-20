@@ -246,8 +246,6 @@ private:
 	ComPtr<ID3D12RootSignature> g_raytracingGlobalRootSignature;
 	ComPtr<ID3D12RootSignature> g_raytracingLocalRootSignature;
 
-	RayGenConstantBuffer g_rayGenCB;
-
 	//Acceleration Structure
 	ComPtr<ID3D12Resource> g_accelerationStructure;
 	ComPtr<ID3D12Resource> g_topLevelAccelerationStructure;
@@ -300,6 +298,7 @@ private:
 	UINT g_ObjectCBVOffset = 0;
 	UINT g_RaytracingCBVOffset = 0;
 	UINT g_RaytracingDescriptorsAllocated = 0;
+	UINT g_hitGroupShaderTableStrideInBytes = 0;
 
 	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D12PipelineState>> g_PSOs;
 	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3DBlob>> g_Shaders;

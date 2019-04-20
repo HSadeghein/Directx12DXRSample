@@ -1,3 +1,6 @@
+//#pragma pack_matrix( column_major )
+
+
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorld;
@@ -8,7 +11,6 @@ cbuffer cbPass : register(b1)
     float4x4 gView;
     float4x4 gInvView;
     float4x4 gProj;
-	float4x4 gProjToWorld;
     float4x4 gInvProj;
     float4x4 gViewProj;
     float4x4 gInvViewProj;

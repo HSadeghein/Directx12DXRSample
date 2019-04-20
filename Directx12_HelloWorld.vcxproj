@@ -248,7 +248,7 @@ xcopy "$(ProjectDir)Additional DLLs\dxcompiler.dll" "$(TargetDir)" /Y</Command>
       <HeaderFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)CompiledShaders\%(Filename).hlsl.h</HeaderFileOutput>
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
       </EntryPointName>
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/Zpr %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/Zpc %(AdditionalOptions)</AdditionalOptions>
     </FxCompile>
     <FxCompile Include="VertexShader.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
