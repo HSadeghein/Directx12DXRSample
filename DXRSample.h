@@ -29,6 +29,7 @@ namespace RaytraceGlobalRootSignatureParams {
 		OutputViewSlot = 0,
 		AccelerationStructureSlot,
 		ScenceConstantBufferSlot,
+		VertexBufferSlot,
 		Count
 	};
 }
@@ -52,10 +53,10 @@ using namespace Microsoft::WRL;
 
 
 
-struct VertexPosColor
+struct VertexNormal
 {
 	XMFLOAT3 position;
-	XMFLOAT3 color;
+	XMFLOAT3 normal;
 };
 
 struct RenderItem
@@ -101,6 +102,7 @@ public:
 	void BuildShapeGeometry(ID3D12GraphicsCommandList* commandList);
 	void BuildTriangle(ID3D12GraphicsCommandList* commandList);
 	void BuildRenderTriangleItem();
+	UINT CreateBufferSRV(D3DBuffer* buffer, UINT numElements, UINT elementSize);
 	void BuildPSOs();
 	void BuildMaterials();
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
@@ -193,6 +195,10 @@ private:
 	void SerializeAndCreateRaytracingRootSignature(D3D12_ROOT_SIGNATURE_DESC & desc, ComPtr<ID3D12RootSignature>* rootSig);
 	void CreateRaytracingPipelineStateObject();
 	void CreateLocalRootSignatureSubobjects(CD3D12_STATE_OBJECT_DESC * raytracingPipeline);
+	AccelerationStructureBuffers BuildBottomLevelAccelerationStructure();
+	AccelerationStructureBuffers BuildBottomLevelAccelerationStructure(uint32_t numGeometries, std::string name);
+	AccelerationStructureBuffers BuildBottomLevelAccelerationStructure(uint32_t numGeometries);
+	AccelerationStructureBuffers CreateTopLevelAccelerationStructure(AccelerationStructureBuffers bottomLevelAS[2]);
 	void BuildAccelerationStructures();
 	void CopyRaytracingOutputToBackbuffer(ID3D12GraphicsCommandList * commandList);
 	WRAPPED_GPU_POINTER CreateFallbackWrappedPointer(ID3D12Resource * resource, UINT bufferNumElements);
@@ -249,7 +255,7 @@ private:
 	//Acceleration Structure
 	ComPtr<ID3D12Resource> g_accelerationStructure;
 	ComPtr<ID3D12Resource> g_topLevelAccelerationStructure;
-	ComPtr<ID3D12Resource> g_bottomLevelAccelerationStructure;
+	ComPtr<ID3D12Resource> g_bottomLevelAccelerationStructure[2];
 
 	//Raytracing Output
 	ComPtr<ID3D12Resource> g_raytracingOutput;
@@ -315,5 +321,8 @@ private:
 	bool isWireFrameMode = false;
 	bool g_raster = true;
 
+
+	D3DBuffer m_indexBuffer;
+	D3DBuffer m_vertexBuffer;
 };
 

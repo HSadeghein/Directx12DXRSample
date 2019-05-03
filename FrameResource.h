@@ -23,6 +23,10 @@ struct PassConstants
 	float cbPerObjectPad1 = 0.0f;
 	DirectX::XMFLOAT2 RenderTargetSize = { 0.0f, 0.0f };
 	DirectX::XMFLOAT2 InvRenderTargetSize = { 0.0f, 0.0f };
+	DirectX::XMFLOAT4 lightAmbientColor = { 0.0f,0.0f,0.0f,0.0f };
+	DirectX::XMFLOAT4 lightDiffuseColor = { 0.0f,0.0f,0.0f,0.0f };
+	DirectX::XMFLOAT3 lightPosition = { 0.0f,0.0f,0.0f };
+	float cbPerObjectPad2 = 0.0f;
 	float NearZ = 0.0f;
 	float FarZ = 0.0f;
 	float TotalTime = 0.0f;

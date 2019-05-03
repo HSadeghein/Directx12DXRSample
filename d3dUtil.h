@@ -17,7 +17,7 @@ namespace d3dUtil {
 		UINT VertexCount = 0;
 		UINT StartIndexLocation = 0;
 
-		INT StartVertexLocation = 0;
+		UINT StartVertexLocation = 0;
 
 		DirectX::BoundingBox Bounds;
 	};
