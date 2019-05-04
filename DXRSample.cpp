@@ -23,10 +23,13 @@ using namespace Microsoft::WRL;
 using namespace DirectX;
 
 
+const wchar_t* DXRSample::c_hitShadowGroupName = L"MyHitShadowGroup";
 const wchar_t* DXRSample::c_hitGroupName = L"MyHitGroup";
 const wchar_t* DXRSample::c_raygenShaderName = L"MyRaygenShader";
 const wchar_t* DXRSample::c_closestHitShaderName = L"MyClosestHitShader";
 const wchar_t* DXRSample::c_missShaderName = L"MyMissShader";
+const wchar_t* DXRSample::c_closestHitShadowShaderName = L"MyClosestHitShadowRay";
+const wchar_t* DXRSample::c_missShadowShaderName = L"MyMissShadowRay";
 
 
 // Clamp a value between a min and max range.
@@ -145,7 +148,7 @@ void DXRSample::BuildMaterials()
 	auto triangleMat = std::make_unique<Material>();
 	triangleMat->Name = "triangle";
 	triangleMat->MatCBIndex = 0;
-	triangleMat->DiffuseAlbedo = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	triangleMat->DiffuseAlbedo = DirectX::XMFLOAT4(1.0f, 0.0f, 1.0f, 1.0f);
 
 	g_Materials[triangleMat->Name] = std::move(triangleMat);
 }
@@ -213,6 +216,11 @@ void DXRSample::BuildConstantBufferViews()
 	UINT descriptorIndexVB = CreateBufferSRV(&m_vertexBuffer, static_cast<UINT>(m_vertexBuffer.resource->GetDesc().Width / (sizeof(VertexNormal))), sizeof(VertexNormal));
 	ThrowIfFalse(descriptorIndexVB == descriptorIndexIB + 1, L"Vertex Buffer descriptor index must follow that of Index Buffer descriptor index!");
 
+	CreateBufferSRV(&m_localIndexBufferBox, static_cast<UINT>(m_localIndexBufferBox.resource->GetDesc().Width / (sizeof(uint32_t))), 0);
+	CreateBufferSRV(&m_localVertexBufferBox, static_cast<UINT>(m_localVertexBufferBox.resource->GetDesc().Width / (sizeof(VertexNormal))), sizeof(VertexNormal));
+
+	CreateBufferSRV(&m_localIndexBufferGrid, static_cast<UINT>(m_localIndexBufferGrid.resource->GetDesc().Width / (sizeof(uint32_t))), 0);
+	CreateBufferSRV(&m_localVertexBufferGrid, static_cast<UINT>(m_localVertexBufferGrid.resource->GetDesc().Width / (sizeof(VertexNormal))), sizeof(VertexNormal));
 
 	UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 
@@ -342,31 +350,37 @@ void DXRSample::CreateRaytracingRootSignatures()
 	// Local Root Signature
 	// This is a root signature that enables a shader to have unique arguments that come from shader tables.
 	{
+		CD3DX12_DESCRIPTOR_RANGE ranges[1];
+		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 3);
 		CD3DX12_ROOT_PARAMETER rootParameters[RaytraceLocalRootSignatureParams::Count];
 		rootParameters[RaytraceLocalRootSignatureParams::ViewportConstantSlot].InitAsConstants(SizeOfInUint32(MaterialConstants), 0, 0);
+		rootParameters[RaytraceLocalRootSignatureParams::VertexBufferSlot].InitAsDescriptorTable(1, &ranges[0]);
 		CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
 		localRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
 		SerializeAndCreateRaytracingRootSignature(localRootSignatureDesc, &g_raytracingLocalRootSignature);
 	}
 }
-
+//blinking objects is for this part of the code
 void DXRSample::CreateDescriptorHeaps(ID3D12Device * device)
 {
+
 	UINT objCount = (UINT)g_AllRenderItems.size();
 
 	// Need a CBV descriptor for each object for each frame resource,
-	// +1 for the perPass CBV for each frame resource. +1 for IMGUI. +5 for Raytracing
-	UINT numDescriptors = (objCount + 1) * NUMBER_OF_FRAME_RESOURCES + 1 + 1 + 1 + 3 + 2;
+	// +1 for the perPass CBV for each frame resource. +1 for IMGUI.
+	UINT numDescriptors = (objCount + 1) * NUMBER_OF_FRAME_RESOURCES + 1 + 1 + 1 + 2 + 2 + 4;
 
 	// Save an offset to the start of the pass CBVs.  These are the last 3 descriptors.
 	// Allocate a heap for 3 descriptors:
 	// 4 - bottom and top level acceleration structure fallback wrapped pointers
-	// 3 for bottom level for instancing and 1 for top level
+	// 2 for bottom level for instancing(2blas) and 1 for toplevel in shader BVH
+	// 2 for vertex and index SRV global
+	// 4 for index and vertex srv local
 	// 1 - ray-tracing output texture SRV
 	// The first one is for imgui
 	// The 2,3,4,5th is for DXR
 	g_RaytracingCBVOffset = 1;
-	g_ObjectCBVOffset = g_RaytracingCBVOffset + 1 + 1 + 3 + 2;
+	g_ObjectCBVOffset = g_RaytracingCBVOffset + 1 + 1 + 2 + 2 + 4;
 	g_PassCBVOffset = objCount * NUMBER_OF_FRAME_RESOURCES + g_ObjectCBVOffset;
 	
 	
@@ -604,7 +618,7 @@ void DXRSample::BuildTriangle(ID3D12GraphicsCommandList* commandList)
 
 	GeometryGenerator geoGen;
 	GeometryGenerator::MeshData box = geoGen.CreateBox(1.5f, 2.0f, 1.5f, 0);
-	GeometryGenerator::MeshData grid = geoGen.CreateGrid(20.0f, 20.0f, 16, 16);
+	GeometryGenerator::MeshData grid = geoGen.CreateGrid(20.0f, 20.0f, 4, 4);
 
 
 
@@ -625,8 +639,13 @@ void DXRSample::BuildTriangle(ID3D12GraphicsCommandList* commandList)
 
 
 	std::vector<VertexNormal> totalVertices(box.Vertices.size() + grid.Vertices.size());
+	std::vector<VertexNormal> boxVertices(box.Vertices.size());
+	std::vector<VertexNormal> gridVertices(grid.Vertices.size());
+
 	std::vector<std::uint16_t> totalIndices;
 	std::vector<std::uint32_t> totalIndices1;
+	std::vector<std::uint32_t> boxIndices;
+	std::vector<std::uint32_t> gridIndices;
 
 
 	totalIndices.insert(totalIndices.end(), std::begin(box.GetIndices16()), std::end(box.GetIndices16()));
@@ -635,10 +654,13 @@ void DXRSample::BuildTriangle(ID3D12GraphicsCommandList* commandList)
 	totalIndices1.insert(totalIndices1.end(), std::begin(box.Indices32), std::end(box.Indices32));
 	totalIndices1.insert(totalIndices1.end(), std::begin(grid.Indices32), std::end(grid.Indices32));
 
-	for (size_t i = subMeshPlane.StartIndexLocation; i < subMeshPlane.StartIndexLocation + subMeshPlane.IndexCount; i++)
-	{
-		//totalIndices1[i] += subMeshPlane.StartVertexLocation;
-	}
+	boxIndices.insert(boxIndices.end(), std::begin(box.Indices32), std::end(box.Indices32));
+	gridIndices.insert(gridIndices.end(), std::begin(grid.Indices32), std::end(grid.Indices32));
+
+	//for (size_t i = subMeshPlane.StartIndexLocation; i < subMeshPlane.StartIndexLocation + subMeshPlane.IndexCount; i++)
+	//{
+	//	totalIndices1[i] += subMeshPlane.StartVertexLocation;
+	//}
 
 	int k = 0;
 
@@ -646,18 +668,25 @@ void DXRSample::BuildTriangle(ID3D12GraphicsCommandList* commandList)
 	{
 		totalVertices[k].position = box.Vertices[i].Position;
 		totalVertices[k].normal = box.Vertices[i].Normal;
+
+		boxVertices[i].position = box.Vertices[i].Position;
+		boxVertices[i].normal = box.Vertices[i].Normal;
 		k++;
 	}
 	for (size_t i = 0; i < grid.Vertices.size(); i++)
 	{
 		totalVertices[k].position = grid.Vertices[i].Position;
 		totalVertices[k].normal = grid.Vertices[i].Normal;
+
+		gridVertices[i].position = grid.Vertices[i].Position;
+		gridVertices[i].normal = grid.Vertices[i].Normal;
+
 		k++;
 	}
 
 
 	const UINT vbByteSize = (UINT)totalVertices.size() * sizeof(VertexNormal);
-	const UINT ibByteSize = (UINT)totalIndices1.size() * sizeof(std::uint16_t);
+	const UINT ibByteSize = (UINT)totalIndices.size() * sizeof(std::uint16_t);
 
 	auto geo = std::make_unique<d3dUtil::MeshGeometry>();
 
@@ -678,6 +707,11 @@ void DXRSample::BuildTriangle(ID3D12GraphicsCommandList* commandList)
 	AllocateUploadBuffer(device.Get(), totalIndices1.data(), ibByteSize * 2, m_indexBuffer.resource.GetAddressOf());
 	AllocateUploadBuffer(device.Get(), totalVertices.data(), vbByteSize, m_vertexBuffer.resource.GetAddressOf());
 
+	AllocateUploadBuffer(device.Get(), boxIndices.data(), boxIndices.size() * 4, m_localIndexBufferBox.resource.GetAddressOf());
+	AllocateUploadBuffer(device.Get(), boxVertices.data(), boxVertices.size() * sizeof(VertexNormal), m_localVertexBufferBox.resource.GetAddressOf());
+
+	AllocateUploadBuffer(device.Get(), gridIndices.data(), gridIndices.size() * 4, m_localIndexBufferGrid.resource.GetAddressOf());
+	AllocateUploadBuffer(device.Get(), gridVertices.data(), gridVertices.size() * sizeof(VertexNormal), m_localVertexBufferGrid.resource.GetAddressOf());
 
 	geo->VertexByteStride = sizeof(VertexNormal);
 	geo->VertexBufferByteSize = vbByteSize;
@@ -714,7 +748,7 @@ void DXRSample::BuildRenderTriangleItem()
 	g_AllRenderItems.push_back(std::move(triangleRitem1));
 
 	auto planeRenderItem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&planeRenderItem->WorldMatrix, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-100.0f, 0.0f, 0.0f));
+	XMStoreFloat4x4(&planeRenderItem->WorldMatrix, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(0.0f, 0.0f, 0.0f));
 	planeRenderItem->ObjCBIndex = 2;
 	planeRenderItem->Mat = g_Materials["triangle"].get();
 	planeRenderItem->Geo = g_Geometries["triangleGeo"].get();
@@ -1006,22 +1040,33 @@ void DXRSample::BuildShaderTables()
 	{
 		struct RootArguments {
 			MaterialConstants cb;
+			UINT64 handle;
 		} rootArguments1,rootArguments2, rootArguments3;
 		MaterialConstants tmp;
 		tmp.DiffuseAlbedo = g_Materials["triangle"].get()->DiffuseAlbedo;
 		tmp.FresnelR0 = g_Materials["triangle"].get()->FresnelR0;
 		tmp.Roughness = g_Materials["triangle"].get()->Roughness;
 		rootArguments1.cb = tmp;
-		rootArguments3.cb = tmp;
+		rootArguments1.handle = m_localIndexBufferBox.gpuDescriptorHandle.ptr;
+		tmp.DiffuseAlbedo.x = 0.0f;
 		rootArguments2.cb = tmp;
+		rootArguments2.handle = m_localIndexBufferGrid.gpuDescriptorHandle.ptr;
+		rootArguments3.cb = tmp;
 
-		UINT numShaderRecords = 3;
-		UINT shaderRecordSize = shaderIdentifierSize + sizeof(rootArguments1);
+
+#define ALIGN(alignment, num) ((((num) + alignment - 1) / alignment) * alignment)
+		const UINT offsetToDescriptorHandle = ALIGN(sizeof(D3D12_GPU_DESCRIPTOR_HANDLE), shaderIdentifierSize);
+		const UINT offsetToMaterialConstants = ALIGN(sizeof(UINT32), offsetToDescriptorHandle + sizeof(D3D12_GPU_DESCRIPTOR_HANDLE));
+		const UINT shaderRecordSizeInBytes = ALIGN(D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT, offsetToMaterialConstants + sizeof(MaterialConstants));
+
+
+		UINT numShaderRecords = 2;
+		UINT shaderRecordSize = shaderRecordSizeInBytes;
 		g_hitGroupShaderTableStrideInBytes = shaderRecordSize;
 		ShaderTable hitGroupShaderTable(device.Get(), numShaderRecords, shaderRecordSize, L"HitGroupShaderTable");
 		hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments1, sizeof(rootArguments1)));
-		hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments1, sizeof(rootArguments1)));
 		hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments2, sizeof(rootArguments2)));
+		//hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments2, sizeof(rootArguments2)));
 		m_hitGroupShaderTable = hitGroupShaderTable.GetResource();
 	}
 }
@@ -1104,7 +1149,7 @@ void DXRSample::CreateRaytracingPipelineStateObject()
    // This simple sample utilizes default shader association except for local root signature subobject
    // which has an explicit association specified purely for demonstration purposes.
    // 1 - DXIL library
-   // 1 - Triangle hit group
+   // 2 - Triangle hit group
    // 1 - Shader config
    // 2 - Local root signature and association
    // 1 - Global root signature
@@ -1121,19 +1166,32 @@ void DXRSample::CreateRaytracingPipelineStateObject()
 	// Define which shader exports to surface from the library.
 	// If no shader exports are defined for a DXIL library subobject, all shaders will be surfaced.
 	// In this sample, this could be omitted for convenience since the sample uses all shaders in the library. 
-	{
-		lib->DefineExport(c_raygenShaderName);
-		lib->DefineExport(c_closestHitShaderName);
-		lib->DefineExport(c_missShaderName);
-	}
+	//{
+	//	lib->DefineExport(c_raygenShaderName);
+	//	lib->DefineExport(c_closestHitShaderName);
+	//	lib->DefineExport(c_missShaderName);
+	//	//shadow ray
+	//	lib->DefineExport(c_closestHitShadowShaderName);
+	//	lib->DefineExport(c_missShadowShaderName);
+	//}
 
 	// Triangle hit group
 	// A hit group specifies closest hit, any hit and intersection shaders to be executed when a ray intersects the geometry's triangle/AABB.
 	// In this sample, we only use triangle geometry with a closest hit shader, so others are not set.
-	auto hitGroup = raytracingPipeline.CreateSubobject<CD3D12_HIT_GROUP_SUBOBJECT>();
-	hitGroup->SetClosestHitShaderImport(c_closestHitShaderName);
-	hitGroup->SetHitGroupExport(c_hitGroupName);
-	hitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
+
+	{
+		auto hitGroup = raytracingPipeline.CreateSubobject<CD3D12_HIT_GROUP_SUBOBJECT>();
+		hitGroup->SetClosestHitShaderImport(c_closestHitShaderName);
+		hitGroup->SetHitGroupExport(c_hitGroupName);
+		hitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
+	}
+	//{
+	//	auto hitGroup = raytracingPipeline.CreateSubobject<CD3D12_HIT_GROUP_SUBOBJECT>();
+	//	hitGroup->SetClosestHitShaderImport(c_closestHitShaderName);
+	//	hitGroup->SetHitGroupExport(c_hitShadowGroupName);
+	//	hitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
+	//}
+
 
 	// Shader config
 	// Defines the maximum sizes in bytes for the ray payload and attribute structure.
@@ -1187,6 +1245,7 @@ void DXRSample::CreateLocalRootSignatureSubobjects(CD3D12_STATE_OBJECT_DESC* ray
 		// Shader association
 		auto rootSignatureAssociation = raytracingPipeline->CreateSubobject<CD3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
 		rootSignatureAssociation->SetSubobjectToAssociate(*localRootSignature);
+		const wchar_t* tmp[] = { c_hitGroupName,c_hitShadowGroupName };
 		rootSignatureAssociation->AddExport(c_hitGroupName);
 	}
 }
@@ -1586,7 +1645,7 @@ AccelerationStructureBuffers DXRSample::CreateTopLevelAccelerationStructure(Acce
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& topLevelInputs = asDesc.Inputs;
 	topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 	topLevelInputs.Flags = buildFlags;
-	topLevelInputs.NumDescs = 3;
+	topLevelInputs.NumDescs = 1;
 	topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 	topLevelInputs.pGeometryDescs = nullptr;
 
@@ -1628,15 +1687,15 @@ AccelerationStructureBuffers DXRSample::CreateTopLevelAccelerationStructure(Acce
 	{
 		D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC* instanceDescs;
 
-		AllocateUploadBuffer(device.Get(), &instanceDescs, sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC) * 3, &instanceResource, L"InstanceDescs");
+		AllocateUploadBuffer(device.Get(), &instanceDescs, sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC) * 1, &instanceResource, L"InstanceDescs");
 		instanceResource->Map(0, nullptr, (void**)& instanceDescs);
-		ZeroMemory(instanceDescs, sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC) * 3);
+		ZeroMemory(instanceDescs, sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC) * 1);
 		WRAPPED_GPU_POINTER blas[] = {
 			CreateFallbackWrappedPointer(bottomLevelAS[0].accelerationStructure.Get(), static_cast<UINT>(bottomLevelAS[0].ResultDataMaxSizeInBytes) / sizeof(UINT32)),
 			CreateFallbackWrappedPointer(bottomLevelAS[1].accelerationStructure.Get(), static_cast<UINT>(bottomLevelAS[1].ResultDataMaxSizeInBytes) / sizeof(UINT32))
 		};
 		
-		for (size_t i = 0; i < 3; i++)
+		for (size_t i = 0; i < 1; i++)
 		{
 			instanceDescs[i].InstanceID = i;
 			instanceDescs[i].InstanceMask = 0xFF;

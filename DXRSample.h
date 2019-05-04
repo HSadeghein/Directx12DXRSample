@@ -37,6 +37,7 @@ namespace RaytraceGlobalRootSignatureParams {
 namespace RaytraceLocalRootSignatureParams {
 	enum Value {
 		ViewportConstantSlot = 0,
+		VertexBufferSlot,
 		Count
 	};
 }
@@ -263,10 +264,14 @@ private:
 	UINT g_raytracingOutputResourceUAVDescriptorHeapIndex;
 
 	// Shader tables
+	static const wchar_t* c_hitShadowGroupName;
 	static const wchar_t* c_hitGroupName;
 	static const wchar_t* c_raygenShaderName;
 	static const wchar_t* c_closestHitShaderName;
 	static const wchar_t* c_missShaderName;
+	static const wchar_t* c_closestHitShadowShaderName;
+	static const wchar_t* c_missShadowShaderName;
+
 	ComPtr<ID3D12Resource> m_missShaderTable;
 	ComPtr<ID3D12Resource> m_hitGroupShaderTable;
 	ComPtr<ID3D12Resource> m_rayGenShaderTable;
@@ -324,5 +329,10 @@ private:
 
 	D3DBuffer m_indexBuffer;
 	D3DBuffer m_vertexBuffer;
+
+	D3DBuffer m_localIndexBufferBox;
+	D3DBuffer m_localVertexBufferBox;
+	D3DBuffer m_localIndexBufferGrid;
+	D3DBuffer m_localVertexBufferGrid;
 };
 
