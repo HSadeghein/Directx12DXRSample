@@ -994,11 +994,12 @@ void DXRSample::BuildShaderTables()
 	void* rayGenShaderIdentifier;
 	void* missShaderIdentifier;
 	void* hitGroupShaderIdentifier;
-
+	void* missShadowShaderIdentifier;
 	auto GetShaderIdentifiers = [&](auto* stateObjectProperties)
 	{
 		rayGenShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
 		missShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
+		missShadowShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShadowShaderName);
 		hitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_hitGroupName);
 	};
 
@@ -1029,11 +1030,14 @@ void DXRSample::BuildShaderTables()
 
 	// Miss shader table
 	{
-		UINT numShaderRecords = 1;
+		UINT numShaderRecords = 2;
 		UINT shaderRecordSize = shaderIdentifierSize;
 		ShaderTable missShaderTable(device.Get(), numShaderRecords, shaderRecordSize, L"MissShaderTable");
 		missShaderTable.push_back(ShaderRecord(missShaderIdentifier, shaderIdentifierSize));
+		missShaderTable.push_back(ShaderRecord(missShadowShaderIdentifier, shaderIdentifierSize));
+
 		m_missShaderTable = missShaderTable.GetResource();
+		g_missShaderTableStrideInBytes = shaderIdentifierSize;
 	}
 
 	// Hit group shader table
@@ -1185,18 +1189,18 @@ void DXRSample::CreateRaytracingPipelineStateObject()
 		hitGroup->SetHitGroupExport(c_hitGroupName);
 		hitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
 	}
-	//{
-	//	auto hitGroup = raytracingPipeline.CreateSubobject<CD3D12_HIT_GROUP_SUBOBJECT>();
-	//	hitGroup->SetClosestHitShaderImport(c_closestHitShaderName);
-	//	hitGroup->SetHitGroupExport(c_hitShadowGroupName);
-	//	hitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
-	//}
+	{
+		auto hitGroup = raytracingPipeline.CreateSubobject<CD3D12_HIT_GROUP_SUBOBJECT>();
+		hitGroup->SetClosestHitShaderImport(c_closestHitShaderName);
+		hitGroup->SetHitGroupExport(c_hitShadowGroupName);
+		hitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
+	}
 
 
 	// Shader config
 	// Defines the maximum sizes in bytes for the ray payload and attribute structure.
 	auto shaderConfig = raytracingPipeline.CreateSubobject<CD3D12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
-	UINT payloadSize = 4 * sizeof(float);   // float4 color
+	UINT payloadSize = 5 * sizeof(float);   // float4 color + uint
 	UINT attributeSize = 2 * sizeof(float); // float2 barycentrics
 	shaderConfig->Config(payloadSize, attributeSize);
 
@@ -1214,7 +1218,7 @@ void DXRSample::CreateRaytracingPipelineStateObject()
 	auto pipelineConfig = raytracingPipeline.CreateSubobject<CD3D12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
 	// PERFOMANCE TIP: Set max recursion depth as low as needed 
 	// as drivers may apply optimization strategies for low recursion depths. 
-	UINT maxRecursionDepth = 1; // ~ primary rays only. 
+	UINT maxRecursionDepth = 2; // ~ primary rays only. 
 	pipelineConfig->Config(maxRecursionDepth);
 
 #if _DEBUG
@@ -1246,7 +1250,7 @@ void DXRSample::CreateLocalRootSignatureSubobjects(CD3D12_STATE_OBJECT_DESC* ray
 		auto rootSignatureAssociation = raytracingPipeline->CreateSubobject<CD3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
 		rootSignatureAssociation->SetSubobjectToAssociate(*localRootSignature);
 		const wchar_t* tmp[] = { c_hitGroupName,c_hitShadowGroupName };
-		rootSignatureAssociation->AddExport(c_hitGroupName);
+		rootSignatureAssociation->AddExports(tmp);
 	}
 }
 AccelerationStructureBuffers DXRSample::BuildBottomLevelAccelerationStructure()
@@ -1891,7 +1895,7 @@ void DXRSample::DoRaytracing(ID3D12GraphicsCommandList* commandList)
 		dispatchDesc->HitGroupTable.StrideInBytes = g_hitGroupShaderTableStrideInBytes;
 		dispatchDesc->MissShaderTable.StartAddress = m_missShaderTable->GetGPUVirtualAddress();
 		dispatchDesc->MissShaderTable.SizeInBytes = m_missShaderTable->GetDesc().Width;
-		dispatchDesc->MissShaderTable.StrideInBytes = dispatchDesc->MissShaderTable.SizeInBytes;
+		dispatchDesc->MissShaderTable.StrideInBytes = g_missShaderTableStrideInBytes;
 		dispatchDesc->RayGenerationShaderRecord.StartAddress = m_rayGenShaderTable->GetGPUVirtualAddress();
 		dispatchDesc->RayGenerationShaderRecord.SizeInBytes = m_rayGenShaderTable->GetDesc().Width;
 		dispatchDesc->Width = super::GetWidth();

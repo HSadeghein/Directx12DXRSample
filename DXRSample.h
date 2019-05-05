@@ -310,6 +310,7 @@ private:
 	UINT g_RaytracingCBVOffset = 0;
 	UINT g_RaytracingDescriptorsAllocated = 0;
 	UINT g_hitGroupShaderTableStrideInBytes = 0;
+	UINT g_missShaderTableStrideInBytes = 0;
 
 	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D12PipelineState>> g_PSOs;
 	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3DBlob>> g_Shaders;

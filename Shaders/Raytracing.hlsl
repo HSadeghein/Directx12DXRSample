@@ -47,10 +47,7 @@ struct Vertex
 	float3 position;
 	float3 normal;
 };
-struct ShadowPayLoad
-{
-	bool isHit;
-};
+
 
 RaytracingAccelerationStructure Scene : register(t0, space0);
 RWTexture2D<float4> RenderTarget : register(u0);
@@ -64,8 +61,18 @@ typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 struct RayPayload
 {
 	float4 color;
+	uint recursionDepth;
 };
 
+struct ShadowPayLoad
+{
+	bool isHit;
+};
+struct Ray
+{
+    float3 origin;
+    float3 direction;
+};
 inline void GenerateCameraRay(uint2 index, out float3 origin, out float3 direction)
 {
 	float2 xy = index + 0.5f;
@@ -139,10 +146,66 @@ float4 CalculateDiffuseLighting(float3 hitPosition, float3 normal)
 }
 
 
-bool IsInsideViewport(float2 p, Viewport viewport)
+float4 TraceRadianceRay(in Ray ray, in uint currentRayRecursionDepth)
 {
-	return (p.x >= viewport.left && p.x <= viewport.right)
-		&& (p.y >= viewport.top && p.y <= viewport.bottom);
+    if (currentRayRecursionDepth >= 2)
+    {
+        return float4(0, 0, 0, 0);
+    }
+
+    // Set the ray's extents.
+    RayDesc rayDesc;
+    rayDesc.Origin = ray.origin;
+    rayDesc.Direction = ray.direction;
+    // Set TMin to a zero value to avoid aliasing artifacts along contact areas.
+    // Note: make sure to enable face culling so as to avoid surface face fighting.
+    rayDesc.TMin = 0;
+    rayDesc.TMax = 10000;
+    RayPayload rayPayload = { float4(0, 0, 0, 0), currentRayRecursionDepth + 1 };
+    TraceRay(Scene,
+        RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+        ~0,
+        0,
+        1,
+        0,
+        rayDesc, rayPayload);
+
+    return rayPayload.color;
+}
+
+// Trace a shadow ray and return true if it hits any geometry.
+bool TraceShadowRayAndReportIfHit(in Ray ray, in uint currentRayRecursionDepth)
+{
+    if (currentRayRecursionDepth >= 2)
+    {
+        return false;
+    }
+
+    // Set the ray's extents.
+    RayDesc rayDesc;
+    rayDesc.Origin = ray.origin;
+    rayDesc.Direction = ray.direction;
+    // Set TMin to a zero value to avoid aliasing artifcats along contact areas.
+    // Note: make sure to enable back-face culling so as to avoid surface face fighting.
+    rayDesc.TMin = 0.0;
+    rayDesc.TMax = 10000;
+
+    // Initialize shadow ray payload.
+    // Set the initial value to true since closest and any hit shaders are skipped. 
+    // Shadow miss shader, if called, will set it to false.
+    ShadowPayLoad shadowPayload = { true };
+    TraceRay(Scene,
+        RAY_FLAG_CULL_BACK_FACING_TRIANGLES
+		| RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH
+		| RAY_FLAG_FORCE_OPAQUE             // ~skip any hit shaders
+		| RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, // ~skip closest hit shaders,
+        ~0,
+        1,
+        1,
+        1,
+        rayDesc, shadowPayload);
+
+    return shadowPayload.isHit;
 }
 
 
@@ -150,25 +213,36 @@ bool IsInsideViewport(float2 p, Viewport viewport)
 [shader("raygeneration")]
 void MyRaygenShader()
 {
+
 	float3 rayDir;
 	float3 origin;
 
 	float3 raysIndex = DispatchRaysIndex();
 	// Generate a ray for a camera pixel corresponding to an index from the dispatched 2D grid.
 	GenerateCameraRay(raysIndex.xy, origin, rayDir);
-	// Trace the ray.
-	// Set the ray's extents.
-	RayDesc ray;
-	ray.Origin = origin;
-	ray.Direction = rayDir;
-	// Set TMin to a non-zero small value to avoid aliasing issues due to floating - point errors.
-	// TMin should be kept small to prevent missing geometry at close contact areas.
-	ray.TMin = 0.001;
-	ray.TMax = 10000.0;
-	RayPayload payload = { float4(0, 0, 0, 0) };
-	TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES /*rayFlags*/, ~0, 0/*ray index*/, 1/*MultiplierForGeometryContributionToShaderIndex */, 0, ray, payload);
-	// Write the raytraced color to the output texture.
-	RenderTarget[raysIndex.xy] = payload.color;
+	Ray ray;
+	ray.origin = origin;
+	ray.direction = rayDir;
+
+
+	uint currentRecursionDepth = 0;
+	float4 color = TraceRadianceRay(ray, currentRecursionDepth);
+    RenderTarget[raysIndex.xy] = color;
+
+
+	// // Trace the ray.
+	// // Set the ray's extents.
+	// RayDesc ray;
+	// ray.Origin = origin;
+	// ray.Direction = rayDir;
+	// // Set TMin to a non-zero small value to avoid aliasing issues due to floating - point errors.
+	// // TMin should be kept small to prevent missing geometry at close contact areas.
+	// ray.TMin = 0.001;
+	// ray.TMax = 10000.0;
+	// RayPayload payload = { float4(0, 0, 0, 0), currentRecursionDepth + 1};
+	// TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES /*rayFlags*/, ~0, 0/*ray index*/, 1/*MultiplierForGeometryContributionToShaderIndex */, 0, ray, payload);
+	// // Write the raytraced color to the output texture.
+	// RenderTarget[raysIndex.xy] = payload.color;
 }
 
 [shader("closesthit")]
@@ -212,7 +286,12 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 	float4 diffuseColor = CalculateDiffuseLighting(hitPosition, localNormal);
 	float4 color = g_passCB.lightAmbientColor + diffuseColor;
 
-	payload.color = color;
+	Ray shadowRay = { hitPosition, normalize(g_passCB.lightPosition.xyz - hitPosition) };
+	bool shadowRayHit = TraceShadowRayAndReportIfHit(shadowRay, payload.recursionDepth);
+
+	float shadowFactor = shadowRayHit ? 0.5 : 1.0;
+
+	payload.color = color * shadowFactor;
 
 
 }
@@ -228,6 +307,7 @@ void MyMissShader(inout RayPayload payload)
 // {
 // 	payload.isHit = true;
 // }
+
 [shader("miss")]
 void MyMissShadowRay(inout ShadowPayLoad payload)
 {
