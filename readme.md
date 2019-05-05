@@ -32,4 +32,6 @@ The source code of **Fallback Layer** has been added if you want to see, but if 
     *  **`xcopy "$(ProjectDir)Additional DLLs\dxil.dll" "$(TargetDir)" /Y`**
     *  **`xcopy "$(ProjectDir)Additional DLLs\dxcompiler.dll" "$(TargetDir)" /Y `**
 ### Showcase
-![](sample.gif)
+| Rasterization | Ray-Tracing |
+| --- | --- |
+| ![Screenshot](Data/Raster.png) | ![Screenshot](Data/Raytracing.png) |
