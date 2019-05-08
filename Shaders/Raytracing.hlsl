@@ -13,6 +13,8 @@
 #define RAYTRACING_HLSL
 
 #include "RaytracingHlslCompat.h"
+
+#define M_PI 3.14159265359f
 struct passCB
 {
 	float4x4 gView;
@@ -142,7 +144,7 @@ float4 CalculateDiffuseLighting(float3 hitPosition, float3 normal)
 	// Diffuse contribution.
 	float fNDotL = max(0.0f, dot(pixelToLight, normal));
 
-	return g_rayGenCB.gDiffuseAlbedo* g_passCB.lightDiffuseColor * fNDotL;
+	return g_rayGenCB.gDiffuseAlbedo * g_passCB.lightDiffuseColor * fNDotL / M_PI;
 }
 
 
@@ -286,10 +288,12 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 	float4 diffuseColor = CalculateDiffuseLighting(hitPosition, localNormal);
 	float4 color = g_passCB.lightAmbientColor + diffuseColor;
 
-	Ray shadowRay = { hitPosition, normalize(g_passCB.lightPosition.xyz - hitPosition) };
+	float3 lightPosition = g_passCB.lightPosition.xyz;
+
+	Ray shadowRay = { hitPosition, normalize(lightPosition - hitPosition) };
 	bool shadowRayHit = TraceShadowRayAndReportIfHit(shadowRay, payload.recursionDepth);
 
-	float shadowFactor = shadowRayHit ? 0.5 : 1.0;
+	float shadowFactor = shadowRayHit ? 0.2 : 1.0;
 
 	payload.color = color * shadowFactor;
 

@@ -1728,24 +1728,24 @@ AccelerationStructureBuffers DXRSample::CreateTopLevelAccelerationStructure(Acce
 		instanceResource->Map(0, nullptr, (void**)& instanceDescs);
 		ZeroMemory(instanceDescs, sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC) * 2);
 
-		for (size_t i = 0; i < 2; i++)
+		for (size_t i = 0; i < i; i++)
 		{
-			instanceDescs[i].InstanceID = g_AllOpaqueItems.at(i)->ObjCBIndex;
+			instanceDescs[i].InstanceID = i;
 			instanceDescs[i].InstanceMask = 0xFF;
 			instanceDescs[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-			instanceDescs[i].InstanceContributionToHitGroupIndex = i; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+			instanceDescs[i].InstanceContributionToHitGroupIndex = 0; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
 			instanceDescs[i].AccelerationStructure = bottomLevelAS[0].accelerationStructure->GetGPUVirtualAddress();
 			XMMATRIX world = XMLoadFloat4x4(&g_AllOpaqueItems.at(i)->WorldMatrix);
 			memcpy(instanceDescs[i].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[i].Transform));
 
 		}
-		instanceDescs[2].InstanceID = g_AllOpaqueItems.at(2)->ObjCBIndex;
-		instanceDescs[2].InstanceMask = 0xFF;
-		instanceDescs[2].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-		instanceDescs[2].InstanceContributionToHitGroupIndex = 2; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
-		instanceDescs[2].AccelerationStructure = bottomLevelAS[1].accelerationStructure->GetGPUVirtualAddress();
-		XMMATRIX world = XMLoadFloat4x4(&g_AllOpaqueItems.at(2)->WorldMatrix);
-		memcpy(instanceDescs[2].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[2].Transform));
+		//instanceDescs[2].InstanceID = g_AllOpaqueItems.at(2)->ObjCBIndex;
+		//instanceDescs[2].InstanceMask = 0xFF;
+		//instanceDescs[2].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+		//instanceDescs[2].InstanceContributionToHitGroupIndex = 2; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+		//instanceDescs[2].AccelerationStructure = bottomLevelAS[1].accelerationStructure->GetGPUVirtualAddress();
+		//XMMATRIX world = XMLoadFloat4x4(&g_AllOpaqueItems.at(2)->WorldMatrix);
+		//memcpy(instanceDescs[2].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[2].Transform));
 
 		instanceResource->Unmap(0, nullptr);
 	}
