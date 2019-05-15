@@ -49,6 +49,14 @@ namespace RasterRootSignatureParam {
 		Count
 	};
 }
+namespace RenderItemsParam {
+	enum Value {
+		cube0 = 0,
+		cube1,
+		plane,
+		Count
+	};
+}
 using namespace Microsoft::WRL;
 
 
@@ -80,6 +88,20 @@ struct RenderItem
 	UINT StartIndexLocation = 0;
 	int BaseVertexLocation = 0;
 
+};
+
+struct ImguiData
+{
+	float Light0DiffuseColor[4] = { 1.0f,1.0f,1.0f,1.0f };
+	float Light1DiffuseColor[4] = { 1.0f,1.0f,1.0f,1.0f };
+
+	float Light0AmbientColor[4];
+	float Light1AmbientColor[4];
+
+	float Light0Position[3];
+	float Light1Position[3];
+
+	float CubePosition[3] = { 10.0f,10.0f,0.0f };
 };
 
 class DXRSample : public Game
@@ -200,6 +222,7 @@ private:
 	AccelerationStructureBuffers BuildBottomLevelAccelerationStructure(uint32_t numGeometries, std::string name);
 	AccelerationStructureBuffers BuildBottomLevelAccelerationStructure(uint32_t numGeometries);
 	AccelerationStructureBuffers CreateTopLevelAccelerationStructure(AccelerationStructureBuffers bottomLevelAS[2]);
+	AccelerationStructureBuffers UpdateTopLevelAccelerationStructure(AccelerationStructureBuffers bottomLevelAS[2], AccelerationStructureBuffers topLevel);
 	void BuildAccelerationStructures();
 	void CopyRaytracingOutputToBackbuffer(ID3D12GraphicsCommandList * commandList);
 	WRAPPED_GPU_POINTER CreateFallbackWrappedPointer(ID3D12Resource * resource, UINT bufferNumElements);
@@ -207,6 +230,8 @@ private:
 	void ReleaseWindowSizeDependentResource();
 
 	void ReleaseDeviceDependentResource();
+
+	void UpdateUI();
 
 	uint64_t g_FenceValues[Window::BufferCount] = {};
 
@@ -255,7 +280,7 @@ private:
 
 	//Acceleration Structure
 	ComPtr<ID3D12Resource> g_accelerationStructure;
-	ComPtr<ID3D12Resource> g_topLevelAccelerationStructure;
+	AccelerationStructureBuffers g_topLevelAccelerationStructure;
 	ComPtr<ID3D12Resource> g_bottomLevelAccelerationStructure[2];
 
 	//Raytracing Output
@@ -335,5 +360,10 @@ private:
 	D3DBuffer m_localVertexBufferBox;
 	D3DBuffer m_localIndexBufferGrid;
 	D3DBuffer m_localVertexBufferGrid;
+
+	ImguiData uiData{};
+	float lightColor[4] = { 1.0f,1.0f,1.0f,1.0f };
+	float lightPosition[3] = { 0.0f,0.0f,0.0f };
+
 };
 

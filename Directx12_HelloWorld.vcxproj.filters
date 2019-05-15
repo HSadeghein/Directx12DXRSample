@@ -156,9 +156,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Shaders\Raytracing.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
     <FxCompile Include="Shaders\color.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
@@ -166,6 +163,9 @@
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="Shaders\PixelShader.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\Raytracing.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

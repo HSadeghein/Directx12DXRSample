@@ -136,6 +136,14 @@ float3 HitAttribute(float3 vertexAttribute[3], BuiltInTriangleIntersectionAttrib
 		attr.barycentrics.y * (vertexAttribute[2] - vertexAttribute[0]);
 }
 
+// Fresnel reflectance - schlick approximation.
+float FresnelReflectanceSchlick(in float3 I, in float3 N, in float3 f0)
+{
+	float cosi = saturate(dot(-I, N));
+	float r = pow((0.5f) / (2.5f), 2);
+	return r + (1 - r) * pow(1 - cosi, 5);
+}
+
 // Diffuse lighting calculation.
 float4 CalculateDiffuseLighting(float3 hitPosition, float3 normal)
 {
@@ -147,6 +155,26 @@ float4 CalculateDiffuseLighting(float3 hitPosition, float3 normal)
 	return g_rayGenCB.gDiffuseAlbedo * g_passCB.lightDiffuseColor * fNDotL / M_PI;
 }
 
+float4 CalculateBlinnPhong(float3 hitPosition, float3 normal, float hardness, float isInShadow)
+{
+	float3 lightDir = normalize(g_passCB.lightPosition.xyz - hitPosition);
+	float3 viewDir = normalize(g_passCB.gEyePosW - hitPosition);
+	float shadowFactor = isInShadow ? 0.1f : 1.0f;
+	float4 diffuseColor = CalculateDiffuseLighting(hitPosition, normal) * shadowFactor;
+
+
+	float4 specularColor = float4(0, 0, 0, 0);
+	if (!isInShadow) {
+		float3 H = normalize(lightDir + viewDir);
+		float NdotH = dot(normal, H);
+		float intensity = pow(saturate(NdotH), hardness);
+
+		specularColor = intensity * g_passCB.lightDiffuseColor / M_PI;
+
+	}
+	return diffuseColor + specularColor;
+
+}
 
 float4 TraceRadianceRay(in Ray ray, in uint currentRayRecursionDepth)
 {
@@ -285,17 +313,30 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 	float3 localNormal = (vertexNormals[0] * bary.x + vertexNormals[1] * bary.y + vertexNormals[2] * bary.z);
 
 
-	float4 diffuseColor = CalculateDiffuseLighting(hitPosition, localNormal);
-	float4 color = g_passCB.lightAmbientColor + diffuseColor;
+
 
 	float3 lightPosition = g_passCB.lightPosition.xyz;
 
 	Ray shadowRay = { hitPosition, normalize(lightPosition - hitPosition) };
 	bool shadowRayHit = TraceShadowRayAndReportIfHit(shadowRay, payload.recursionDepth);
+	float shadowFactor = shadowRayHit ? 0.1 : 1.0f;
+	// Reflected component.
+	float4 reflectedColor = float4(0, 0, 0, 0);
+	if (true)
+	{
+		// Trace a reflection ray.
+		Ray reflectionRay = { HitWorldPosition(), reflect(WorldRayDirection(), localNormal) };
+		float4 reflectionColor = TraceRadianceRay(reflectionRay, payload.recursionDepth);
 
-	float shadowFactor = shadowRayHit ? 0.2 : 1.0;
+		float fresnelR = FresnelReflectanceSchlick(WorldRayDirection(), localNormal, g_rayGenCB.gDiffuseAlbedo.xyz);
+		reflectedColor = g_rayGenCB.gRoughness * fresnelR * reflectionColor;
+	}
+	float4 phongColor = CalculateBlinnPhong(hitPosition, localNormal, 200, shadowRayHit);
+	float4 color = g_passCB.lightAmbientColor + phongColor ;
 
-	payload.color = color * shadowFactor;
+	float4 finalColor = color + reflectedColor ;
+
+	payload.color = finalColor;
 
 
 }
