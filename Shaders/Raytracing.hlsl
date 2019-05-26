@@ -330,11 +330,11 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 	float4 reflectedColor = float4(0, 0, 0, 0);
 
 	 //Trace a reflection ray.
-	//Ray reflectionRay = { HitWorldPosition() -0.001f, reflect(WorldRayDirection(), localNormal) };
-	//float4 reflectionColor = TraceRadianceRay(reflectionRay, payload.recursionDepth);
+	Ray reflectionRay = { HitWorldPosition() -0.001f, reflect(WorldRayDirection(), localNormal) };
+	float4 reflectionColor = TraceRadianceRay(reflectionRay, payload.recursionDepth);
 
-	//float fresnelR = FresnelReflectanceSchlick(WorldRayDirection(), localNormal, g_closestHitCB.gDiffuseAlbedo.xyz);
-	//reflectedColor =   g_closestHitCB.gRoughness * fresnelR * reflectionColor;
+	float fresnelR = FresnelReflectanceSchlick(WorldRayDirection(), localNormal, g_closestHitCB.gDiffuseAlbedo.xyz);
+	reflectedColor =   g_closestHitCB.gRoughness * fresnelR * reflectionColor;
 
 	float4 phongColor = CalculateBlinnPhong(hitPosition, localNormal, g_passCB.SpecularPower, shadowRayHit);
 	float4 color = phongColor;
