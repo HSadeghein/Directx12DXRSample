@@ -34,6 +34,7 @@ void Game::Destroy()
 {
 	Application::Get().DestroyWindow(g_pWindow);
 	g_pWindow.reset();
+
 }
 
 void Game::OnUpdate(UpdateEventArgs& e)

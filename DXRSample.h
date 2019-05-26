@@ -29,7 +29,6 @@ namespace RaytraceGlobalRootSignatureParams {
 		OutputViewSlot = 0,
 		AccelerationStructureSlot,
 		ScenceConstantBufferSlot,
-		VertexBufferSlot,
 		Count
 	};
 }
@@ -52,7 +51,8 @@ namespace RasterRootSignatureParam {
 namespace RenderItemsParam {
 	enum Value {
 		cube0 = 0,
-		cube1,
+		sphere,
+		cylinder,
 		plane,
 		Count
 	};
@@ -101,7 +101,20 @@ struct ImguiData
 	float Light0Position[3];
 	float Light1Position[3];
 
-	float CubePosition[3] = { 10.0f,10.0f,0.0f };
+	float Light0Power = { 1.0f };
+	float Light0SpecularPower = { 50.0f };
+
+	float CubePosition[3] = { 0.0f,0.0f,0.0f };
+	float PlanePosition[3] = { 0.0f,0.0f,0.0f };
+	float SpherePosition[3] = { 5.0f,0.0f,0.0f };
+	float CylinderPosition[3] = { -5.0f,0.0f,0.0f };
+};
+
+struct WrapperPointer
+{
+	WrapperPointer() = default;
+	WRAPPED_GPU_POINTER blas[2] = { NULL,NULL };
+	WRAPPED_GPU_POINTER toplevel = { NULL };
 };
 
 class DXRSample : public Game
@@ -153,6 +166,8 @@ protected:
 	 * while the window has focus.
 	 */
 	virtual void OnKeyPressed(KeyEventArgs& e) override;
+	
+	virtual void OnKeyReleased(KeyEventArgs& e) override;
 
 	///**
 	// * Invoked when a key on the keyboard is released.
@@ -220,9 +235,8 @@ private:
 	void CreateLocalRootSignatureSubobjects(CD3D12_STATE_OBJECT_DESC * raytracingPipeline);
 	AccelerationStructureBuffers BuildBottomLevelAccelerationStructure();
 	AccelerationStructureBuffers BuildBottomLevelAccelerationStructure(uint32_t numGeometries, std::string name);
-	AccelerationStructureBuffers BuildBottomLevelAccelerationStructure(uint32_t numGeometries);
-	AccelerationStructureBuffers CreateTopLevelAccelerationStructure(AccelerationStructureBuffers bottomLevelAS[2]);
-	AccelerationStructureBuffers UpdateTopLevelAccelerationStructure(AccelerationStructureBuffers bottomLevelAS[2], AccelerationStructureBuffers topLevel);
+	AccelerationStructureBuffers CreateTopLevelAccelerationStructure(AccelerationStructureBuffers bottomLevelAS[4]);
+	void UpdateTopLevelAccelerationStructure(AccelerationStructureBuffers bottomLevelAS[4], AccelerationStructureBuffers topLevel, ID3D12GraphicsCommandList* commandList);
 	void BuildAccelerationStructures();
 	void CopyRaytracingOutputToBackbuffer(ID3D12GraphicsCommandList * commandList);
 	WRAPPED_GPU_POINTER CreateFallbackWrappedPointer(ID3D12Resource * resource, UINT bufferNumElements);
@@ -281,7 +295,7 @@ private:
 	//Acceleration Structure
 	ComPtr<ID3D12Resource> g_accelerationStructure;
 	AccelerationStructureBuffers g_topLevelAccelerationStructure;
-	ComPtr<ID3D12Resource> g_bottomLevelAccelerationStructure[2];
+	AccelerationStructureBuffers g_bottomLevelAccelerationStructure[4];
 
 	//Raytracing Output
 	ComPtr<ID3D12Resource> g_raytracingOutput;
@@ -348,22 +362,27 @@ private:
 	float mTheta = 1.5f*DirectX::XM_PI;
 	float mPhi = 0.2f*DirectX::XM_PI;
 	float mRadius = 15.0f;
+	XMFLOAT4 mWASD = XMFLOAT4(0, 0, 0, 0);
 
 	bool isWireFrameMode = false;
 	bool g_raster = true;
 
 
-	D3DBuffer m_indexBuffer;
-	D3DBuffer m_vertexBuffer;
 
 	D3DBuffer m_localIndexBufferBox;
 	D3DBuffer m_localVertexBufferBox;
 	D3DBuffer m_localIndexBufferGrid;
 	D3DBuffer m_localVertexBufferGrid;
+	D3DBuffer m_localIndexBufferSphere;
+	D3DBuffer m_localVertexBufferSphere;
+	D3DBuffer m_localIndexBufferCylinder;
+	D3DBuffer m_localVertexBufferCylinder;
 
 	ImguiData uiData{};
 	float lightColor[4] = { 1.0f,1.0f,1.0f,1.0f };
 	float lightPosition[3] = { 0.0f,0.0f,0.0f };
+	WrapperPointer mAccelerationWrapperPointer = {};
+	WRAPPED_GPU_POINTER* mBLAS = new WRAPPED_GPU_POINTER[2];
 
 };
 

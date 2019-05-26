@@ -15,13 +15,13 @@ cbuffer cbPass : register(b1)
 	float4x4 gViewProj;
 	float4x4 gInvViewProj;
 	float3 gEyePosW;
-	float cbPerObjectPad1;
+	float lightPower;
 	float2 gRenderTargetSize;
 	float2 gInvRenderTargetSize;
 	float4 lightAmbientColor;
 	float4 lightDiffuseColor;
 	float3 lightPosition;
-	float cbPerObjectPad2;
+	float SpecularPower;
 	float gNearZ;
 	float gFarZ;
 	float gTotalTime;

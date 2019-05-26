@@ -28,5 +28,4 @@ struct RayGenConstantBuffer
 
 
 
-
 #endif // RAYTRACINGHLSLCOMPAT_H

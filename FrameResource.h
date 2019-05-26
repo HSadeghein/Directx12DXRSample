@@ -20,13 +20,13 @@ struct PassConstants
 	DirectX::XMFLOAT4X4 ViewProj = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 InvViewProj = MathHelper::Identity4x4();
 	DirectX::XMFLOAT3 EyePosW = { 0.0f, 0.0f, 0.0f };
-	float cbPerObjectPad1 = 0.0f;
+	float lightPower = 1.0f;
 	DirectX::XMFLOAT2 RenderTargetSize = { 0.0f, 0.0f };
 	DirectX::XMFLOAT2 InvRenderTargetSize = { 0.0f, 0.0f };
 	DirectX::XMFLOAT4 lightAmbientColor = { 0.0f,0.0f,0.0f,0.0f };
 	DirectX::XMFLOAT4 lightDiffuseColor = { 0.0f,0.0f,0.0f,0.0f };
 	DirectX::XMFLOAT3 lightPosition = { 0.0f,0.0f,0.0f };
-	float cbPerObjectPad2 = 0.0f;
+	float SpecularPower = 50.0f;
 	float NearZ = 0.0f;
 	float FarZ = 0.0f;
 	float TotalTime = 0.0f;

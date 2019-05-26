@@ -144,12 +144,37 @@ void DXRSample::BuildPSOs()
 
 void DXRSample::BuildMaterials()
 {
-	auto triangleMat = std::make_unique<Material>();
-	triangleMat->Name = "triangle";
-	triangleMat->MatCBIndex = 0;
-	triangleMat->DiffuseAlbedo = DirectX::XMFLOAT4(1.0f, 0.0f, 1.0f, 1.0f);
+	auto cubeMat = std::make_unique<Material>();
+	cubeMat->Name = "cube";
+	cubeMat->MatCBIndex = 0;
+	cubeMat->DiffuseAlbedo = DirectX::XMFLOAT4(1.0f, 0.0f, 1.0f, 1.0f);
+	cubeMat->Roughness = 0.06f;
 
-	g_Materials[triangleMat->Name] = std::move(triangleMat);
+	auto sphereMat = std::make_unique<Material>();
+	sphereMat->Name = "sphere";
+	sphereMat->DiffuseAlbedo = DirectX::XMFLOAT4(0.2f, 0.3f, 1.0f, 1.0f);
+	sphereMat->MatCBIndex = 1;
+	sphereMat->Roughness = 1.0f;
+
+	auto cylinderMat = std::make_unique<Material>();
+	cylinderMat->Name = "cylinder";
+	cylinderMat->DiffuseAlbedo = DirectX::XMFLOAT4(0.9f, 0.1f, 0.3f, 1.0f);
+	cylinderMat->MatCBIndex = 2;
+	cylinderMat->Roughness = 1.0f;
+
+	auto gridMat = std::make_unique<Material>();
+	gridMat->Name = "grid";
+	gridMat->DiffuseAlbedo = DirectX::XMFLOAT4(0.9f, 0.9f, 1.0f, 1.0f);
+	gridMat->MatCBIndex = 3;
+	gridMat->Roughness = 1.0f;
+
+	g_Materials[cubeMat->Name] = std::move(cubeMat);
+	g_Materials[sphereMat->Name] = std::move(sphereMat);
+	g_Materials[cylinderMat->Name] = std::move(cylinderMat);
+	g_Materials[gridMat->Name] = std::move(gridMat);
+
+
+
 }
 
 void DXRSample::DrawRenderItems(ID3D12GraphicsCommandList * cmdList, const std::vector<RenderItem*>& ritems)
@@ -211,12 +236,16 @@ void DXRSample::BuildConstantBufferViews()
 
 	//Build SRV for Index and Vertex buffers 
 	//sizeof(uint16_t) * 2 because the buffer format which is used in srv is R32
-	UINT descriptorIndexIB = CreateBufferSRV(&m_indexBuffer, static_cast<UINT>( m_indexBuffer.resource->GetDesc().Width / (sizeof(uint32_t))), 0);
-	UINT descriptorIndexVB = CreateBufferSRV(&m_vertexBuffer, static_cast<UINT>(m_vertexBuffer.resource->GetDesc().Width / (sizeof(VertexNormal))), sizeof(VertexNormal));
-	ThrowIfFalse(descriptorIndexVB == descriptorIndexIB + 1, L"Vertex Buffer descriptor index must follow that of Index Buffer descriptor index!");
+
 
 	CreateBufferSRV(&m_localIndexBufferBox, static_cast<UINT>(m_localIndexBufferBox.resource->GetDesc().Width / (sizeof(uint32_t))), 0);
 	CreateBufferSRV(&m_localVertexBufferBox, static_cast<UINT>(m_localVertexBufferBox.resource->GetDesc().Width / (sizeof(VertexNormal))), sizeof(VertexNormal));
+
+	CreateBufferSRV(&m_localIndexBufferSphere, static_cast<UINT>(m_localIndexBufferSphere.resource->GetDesc().Width / (sizeof(uint32_t))), 0);
+	CreateBufferSRV(&m_localVertexBufferSphere, static_cast<UINT>(m_localVertexBufferSphere.resource->GetDesc().Width / (sizeof(VertexNormal))), sizeof(VertexNormal));
+
+	CreateBufferSRV(&m_localIndexBufferCylinder, static_cast<UINT>(m_localIndexBufferCylinder.resource->GetDesc().Width / (sizeof(uint32_t))), 0);
+	CreateBufferSRV(&m_localVertexBufferCylinder, static_cast<UINT>(m_localVertexBufferCylinder.resource->GetDesc().Width / (sizeof(VertexNormal))), sizeof(VertexNormal));
 
 	CreateBufferSRV(&m_localIndexBufferGrid, static_cast<UINT>(m_localIndexBufferGrid.resource->GetDesc().Width / (sizeof(uint32_t))), 0);
 	CreateBufferSRV(&m_localVertexBufferGrid, static_cast<UINT>(m_localVertexBufferGrid.resource->GetDesc().Width / (sizeof(VertexNormal))), sizeof(VertexNormal));
@@ -332,15 +361,13 @@ void DXRSample::CreateRaytracingRootSignatures()
 	// Global Root Signature
 	// This is a root signature that is shared across all ray-tracing shaders invoked during a DispatchRays() call.
 	{
-		CD3DX12_DESCRIPTOR_RANGE ranges[3];
+		CD3DX12_DESCRIPTOR_RANGE ranges[2];
 		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
 		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
-		ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);
 		CD3DX12_ROOT_PARAMETER rootParameters[RaytraceGlobalRootSignatureParams::Count];
 		rootParameters[RaytraceGlobalRootSignatureParams::OutputViewSlot].InitAsDescriptorTable(1, &ranges[0]);
 		rootParameters[RaytraceGlobalRootSignatureParams::AccelerationStructureSlot].InitAsShaderResourceView(0);
 		rootParameters[RaytraceGlobalRootSignatureParams::ScenceConstantBufferSlot].InitAsDescriptorTable(1,&ranges[1]);
-		rootParameters[RaytraceGlobalRootSignatureParams::VertexBufferSlot].InitAsDescriptorTable(1, &ranges[2]);
 
 		CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
 		SerializeAndCreateRaytracingRootSignature(globalRootSignatureDesc, &g_raytracingGlobalRootSignature);
@@ -350,7 +377,7 @@ void DXRSample::CreateRaytracingRootSignatures()
 	// This is a root signature that enables a shader to have unique arguments that come from shader tables.
 	{
 		CD3DX12_DESCRIPTOR_RANGE ranges[1];
-		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 3);
+		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 2);
 		CD3DX12_ROOT_PARAMETER rootParameters[RaytraceLocalRootSignatureParams::Count];
 		rootParameters[RaytraceLocalRootSignatureParams::ViewportConstantSlot].InitAsConstants(SizeOfInUint32(MaterialConstants), 0, 0);
 		rootParameters[RaytraceLocalRootSignatureParams::VertexBufferSlot].InitAsDescriptorTable(1, &ranges[0]);
@@ -367,19 +394,18 @@ void DXRSample::CreateDescriptorHeaps(ID3D12Device * device)
 
 	// Need a CBV descriptor for each object for each frame resource,
 	// +1 for the perPass CBV for each frame resource. +1 for IMGUI.
-	UINT numDescriptors = (objCount + 1) * NUMBER_OF_FRAME_RESOURCES + 1 + 1 + 1 + 2 + 2 + 4;
+	UINT numDescriptors = (objCount + 1) * NUMBER_OF_FRAME_RESOURCES + 1 + 1 + 1 + 4 + 8;
 
 	// Save an offset to the start of the pass CBVs.  These are the last 3 descriptors.
 	// Allocate a heap for 3 descriptors:
-	// 4 - bottom and top level acceleration structure fallback wrapped pointers
-	// 2 for bottom level for instancing(2blas) and 1 for toplevel in shader BVH
-	// 2 for vertex and index SRV global
-	// 4 for index and vertex srv local
+	// 5 - bottom and top level acceleration structure fallback wrapped pointers
+	// 4 for bottom level for instancing(4blas) and 1 for toplevel in shader BVH
+	// 8 for index and vertex srv local
 	// 1 - ray-tracing output texture SRV
 	// The first one is for imgui
 	// The 2,3,4,5th is for DXR
 	g_RaytracingCBVOffset = 1;
-	g_ObjectCBVOffset = g_RaytracingCBVOffset + 1 + 1 + 2 + 2 + 4;
+	g_ObjectCBVOffset = g_RaytracingCBVOffset + 1 + 1 + 4 + 8;
 	g_PassCBVOffset = objCount * NUMBER_OF_FRAME_RESOURCES + g_ObjectCBVOffset;
 	
 	
@@ -617,7 +643,10 @@ void DXRSample::BuildTriangle(ID3D12GraphicsCommandList* commandList)
 
 	GeometryGenerator geoGen;
 	GeometryGenerator::MeshData box = geoGen.CreateBox(1.5f, 2.0f, 1.5f, 0);
-	GeometryGenerator::MeshData grid = geoGen.CreateGrid(20.0f, 20.0f, 4, 4);
+	GeometryGenerator::MeshData grid = geoGen.CreateGrid(2000.0f, 2000.0f, 4, 4);
+	GeometryGenerator::MeshData sphere = geoGen.CreateGeosphere(1.0f, 5);
+	GeometryGenerator::MeshData cylinder = geoGen.CreateCylinder(1.0f, 1.0f, 4.0f, 40, 40);
+
 
 
 
@@ -635,31 +664,44 @@ void DXRSample::BuildTriangle(ID3D12GraphicsCommandList* commandList)
 	subMeshPlane.StartVertexLocation = subMeshBox.VertexCount;
 	subMeshPlane.VertexCount = (UINT)grid.Vertices.size();
 
+	d3dUtil::SubmeshGeometry subMeshSphere;
+	subMeshSphere.IndexCount = (UINT)sphere.Indices32.size();
+	subMeshSphere.StartIndexLocation = subMeshPlane.IndexCount + subMeshPlane.StartIndexLocation;
+	subMeshSphere.VertexCount = (UINT)sphere.Vertices.size();
+	subMeshSphere.StartVertexLocation = subMeshPlane.VertexCount + subMeshPlane.StartVertexLocation;
+
+	d3dUtil::SubmeshGeometry subMeshCylinder;
+	subMeshCylinder.IndexCount = cylinder.Indices32.size();
+	subMeshCylinder.StartIndexLocation = subMeshSphere.IndexCount + subMeshSphere.StartIndexLocation;
+	subMeshCylinder.VertexCount = cylinder.Vertices.size();
+	subMeshCylinder.StartVertexLocation = subMeshSphere.VertexCount + subMeshSphere.StartVertexLocation;
+
+	std::vector<VertexNormal> totalVertices(box.Vertices.size() + grid.Vertices.size() + sphere.Vertices.size() + cylinder.Vertices.size());
+	std::vector<std::uint16_t> totalIndices;
 
 
-	std::vector<VertexNormal> totalVertices(box.Vertices.size() + grid.Vertices.size());
 	std::vector<VertexNormal> boxVertices(box.Vertices.size());
 	std::vector<VertexNormal> gridVertices(grid.Vertices.size());
+	std::vector<VertexNormal> sphereVertices(sphere.Vertices.size());
+	std::vector<VertexNormal> cylinderVertices(cylinder.Vertices.size());
 
-	std::vector<std::uint16_t> totalIndices;
-	std::vector<std::uint32_t> totalIndices1;
 	std::vector<std::uint32_t> boxIndices;
 	std::vector<std::uint32_t> gridIndices;
+	std::vector<std::uint32_t> sphereIndices;
+	std::vector<std::uint32_t> cylinderIndices;
+
 
 
 	totalIndices.insert(totalIndices.end(), std::begin(box.GetIndices16()), std::end(box.GetIndices16()));
 	totalIndices.insert(totalIndices.end(), std::begin(grid.GetIndices16()), std::end(grid.GetIndices16()));
-
-	totalIndices1.insert(totalIndices1.end(), std::begin(box.Indices32), std::end(box.Indices32));
-	totalIndices1.insert(totalIndices1.end(), std::begin(grid.Indices32), std::end(grid.Indices32));
+	totalIndices.insert(totalIndices.end(), std::begin(sphere.GetIndices16()), std::end(sphere.GetIndices16()));
+	totalIndices.insert(totalIndices.end(), std::begin(cylinder.GetIndices16()), std::end(cylinder.GetIndices16()));
 
 	boxIndices.insert(boxIndices.end(), std::begin(box.Indices32), std::end(box.Indices32));
 	gridIndices.insert(gridIndices.end(), std::begin(grid.Indices32), std::end(grid.Indices32));
+	sphereIndices.insert(sphereIndices.end(), std::begin(sphere.Indices32), std::end(sphere.Indices32));
+	cylinderIndices.insert(cylinderIndices.end(), std::begin(cylinder.Indices32), std::end(cylinder.Indices32));
 
-	//for (size_t i = subMeshPlane.StartIndexLocation; i < subMeshPlane.StartIndexLocation + subMeshPlane.IndexCount; i++)
-	//{
-	//	totalIndices1[i] += subMeshPlane.StartVertexLocation;
-	//}
 
 	int k = 0;
 
@@ -682,6 +724,26 @@ void DXRSample::BuildTriangle(ID3D12GraphicsCommandList* commandList)
 
 		k++;
 	}
+	for (size_t i = 0; i < sphere.Vertices.size(); i++)
+	{
+		totalVertices[k].position = sphere.Vertices[i].Position;
+		totalVertices[k].normal = sphere.Vertices[i].Normal;
+
+		sphereVertices[i].position = sphere.Vertices[i].Position;
+		sphereVertices[i].normal = sphere.Vertices[i].Normal;
+
+		k++;
+	}
+	for (size_t i = 0; i < cylinder.Vertices.size(); i++)
+	{
+		totalVertices[k].position = cylinder.Vertices[i].Position;
+		totalVertices[k].normal = cylinder.Vertices[i].Normal;
+
+		cylinderVertices[i].position = cylinder.Vertices[i].Position;
+		cylinderVertices[i].normal = cylinder.Vertices[i].Normal;
+
+		k++;
+	}
 
 
 	const UINT vbByteSize = (UINT)totalVertices.size() * sizeof(VertexNormal);
@@ -689,7 +751,7 @@ void DXRSample::BuildTriangle(ID3D12GraphicsCommandList* commandList)
 
 	auto geo = std::make_unique<d3dUtil::MeshGeometry>();
 
-	geo->Name = "triangleGeo";
+	geo->Name = "ShapeGeo";
 
 	ThrowifFailed(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
 	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), totalVertices.data(), vbByteSize);
@@ -703,8 +765,7 @@ void DXRSample::BuildTriangle(ID3D12GraphicsCommandList* commandList)
 	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(device.Get(),
 		commandList, totalIndices.data(), ibByteSize, geo->IndexBufferUploader);
 
-	AllocateUploadBuffer(device.Get(), totalIndices1.data(), ibByteSize * 2, m_indexBuffer.resource.GetAddressOf());
-	AllocateUploadBuffer(device.Get(), totalVertices.data(), vbByteSize, m_vertexBuffer.resource.GetAddressOf());
+
 
 	AllocateUploadBuffer(device.Get(), boxIndices.data(), boxIndices.size() * 4, m_localIndexBufferBox.resource.GetAddressOf());
 	AllocateUploadBuffer(device.Get(), boxVertices.data(), boxVertices.size() * sizeof(VertexNormal), m_localVertexBufferBox.resource.GetAddressOf());
@@ -712,13 +773,21 @@ void DXRSample::BuildTriangle(ID3D12GraphicsCommandList* commandList)
 	AllocateUploadBuffer(device.Get(), gridIndices.data(), gridIndices.size() * 4, m_localIndexBufferGrid.resource.GetAddressOf());
 	AllocateUploadBuffer(device.Get(), gridVertices.data(), gridVertices.size() * sizeof(VertexNormal), m_localVertexBufferGrid.resource.GetAddressOf());
 
+	AllocateUploadBuffer(device.Get(), sphereIndices.data(), sphereIndices.size() * 4, m_localIndexBufferSphere.resource.GetAddressOf());
+	AllocateUploadBuffer(device.Get(), sphereVertices.data(), sphereVertices.size() * sizeof(VertexNormal), m_localVertexBufferSphere.resource.GetAddressOf());
+
+	AllocateUploadBuffer(device.Get(), cylinderIndices.data(), cylinderIndices.size() * 4, m_localIndexBufferCylinder.resource.GetAddressOf());
+	AllocateUploadBuffer(device.Get(), cylinderVertices.data(), cylinderVertices.size() * sizeof(VertexNormal), m_localVertexBufferCylinder.resource.GetAddressOf());
+
 	geo->VertexByteStride = sizeof(VertexNormal);
 	geo->VertexBufferByteSize = vbByteSize;
 	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
 	geo->IndexBufferByteSize = ibByteSize;
 
-	geo->DrawArgs["triangle"] = subMeshBox;
+	geo->DrawArgs["cube"] = subMeshBox;
 	geo->DrawArgs["grid"] = subMeshPlane;
+	geo->DrawArgs["sphere"] = subMeshSphere;
+	geo->DrawArgs["cylinder"] = subMeshCylinder;
 	g_Geometries[geo->Name] = std::move(geo);
 }
 
@@ -727,35 +796,48 @@ void DXRSample::BuildRenderTriangleItem()
 	auto triangleRitem = std::make_unique<RenderItem>();
 	XMStoreFloat4x4(&triangleRitem->WorldMatrix, XMMatrixScaling(1.0f, 1.0f, 1.0f)*XMMatrixTranslation(0.0f, 0.0f, 0.0f));
 	triangleRitem->ObjCBIndex = 0;
-	triangleRitem->Mat = g_Materials["triangle"].get();
-	triangleRitem->Geo = g_Geometries["triangleGeo"].get();
+	triangleRitem->Mat = g_Materials["cube"].get();
+	triangleRitem->Geo = g_Geometries["ShapeGeo"].get();
 	triangleRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	triangleRitem->IndexCount = triangleRitem->Geo->DrawArgs["triangle"].IndexCount;
-	triangleRitem->StartIndexLocation = triangleRitem->Geo->DrawArgs["triangle"].StartIndexLocation;
-	triangleRitem->BaseVertexLocation = triangleRitem->Geo->DrawArgs["triangle"].StartVertexLocation;
+	triangleRitem->IndexCount = triangleRitem->Geo->DrawArgs["cube"].IndexCount;
+	triangleRitem->StartIndexLocation = triangleRitem->Geo->DrawArgs["cube"].StartIndexLocation;
+	triangleRitem->BaseVertexLocation = triangleRitem->Geo->DrawArgs["cube"].StartVertexLocation;
 	g_AllRenderItems.push_back(std::move(triangleRitem));
 
 	auto triangleRitem1 = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&triangleRitem1->WorldMatrix, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(10.0f, 5.0f, 0.0f));
+	XMStoreFloat4x4(&triangleRitem1->WorldMatrix, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(5.0f, 0.0f, 0.0f));
 	triangleRitem1->ObjCBIndex = 1;
-	triangleRitem1->Mat = g_Materials["triangle"].get();
-	triangleRitem1->Geo = g_Geometries["triangleGeo"].get();
+	triangleRitem1->Mat = g_Materials["sphere"].get();
+	triangleRitem1->Geo = g_Geometries["ShapeGeo"].get();
 	triangleRitem1->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	triangleRitem1->IndexCount = triangleRitem1->Geo->DrawArgs["triangle"].IndexCount;
-	triangleRitem1->StartIndexLocation = triangleRitem1->Geo->DrawArgs["triangle"].StartIndexLocation;
-	triangleRitem1->BaseVertexLocation = triangleRitem1->Geo->DrawArgs["triangle"].StartVertexLocation;
+	triangleRitem1->IndexCount = triangleRitem1->Geo->DrawArgs["sphere"].IndexCount;
+	triangleRitem1->StartIndexLocation = triangleRitem1->Geo->DrawArgs["sphere"].StartIndexLocation;
+	triangleRitem1->BaseVertexLocation = triangleRitem1->Geo->DrawArgs["sphere"].StartVertexLocation;
 	g_AllRenderItems.push_back(std::move(triangleRitem1));
+
+	auto CylinderRenderItem = std::make_unique<RenderItem>();
+	XMStoreFloat4x4(&CylinderRenderItem->WorldMatrix, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-5.0f, 0.0f, 0.0f));
+	CylinderRenderItem->ObjCBIndex = 2;
+	CylinderRenderItem->Mat = g_Materials["cylinder"].get();
+	CylinderRenderItem->Geo = g_Geometries["ShapeGeo"].get();
+	CylinderRenderItem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	CylinderRenderItem->IndexCount = CylinderRenderItem->Geo->DrawArgs["cylinder"].IndexCount;
+	CylinderRenderItem->StartIndexLocation = CylinderRenderItem->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	CylinderRenderItem->BaseVertexLocation = CylinderRenderItem->Geo->DrawArgs["cylinder"].StartVertexLocation;
+	g_AllRenderItems.push_back(std::move(CylinderRenderItem));
 
 	auto planeRenderItem = std::make_unique<RenderItem>();
 	XMStoreFloat4x4(&planeRenderItem->WorldMatrix, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(0.0f, 0.0f, 0.0f));
-	planeRenderItem->ObjCBIndex = 2;
-	planeRenderItem->Mat = g_Materials["triangle"].get();
-	planeRenderItem->Geo = g_Geometries["triangleGeo"].get();
+	planeRenderItem->ObjCBIndex = 3;
+	planeRenderItem->Mat = g_Materials["grid"].get();
+	planeRenderItem->Geo = g_Geometries["ShapeGeo"].get();
 	planeRenderItem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	planeRenderItem->IndexCount = planeRenderItem->Geo->DrawArgs["grid"].IndexCount;
 	planeRenderItem->StartIndexLocation = planeRenderItem->Geo->DrawArgs["grid"].StartIndexLocation;
 	planeRenderItem->BaseVertexLocation = planeRenderItem->Geo->DrawArgs["grid"].StartVertexLocation;
 	g_AllRenderItems.push_back(std::move(planeRenderItem));
+
+
 
 
 	for (auto& e : g_AllRenderItems)
@@ -821,12 +903,13 @@ void DXRSample::ReleaseDeviceDependentResource()
 	g_CBVHeap.Reset();
 	g_RaytracingDescriptorsAllocated = 0;
 	g_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
-	//m_indexBuffer.Reset();
-	//m_vertexBuffer.Reset();
+
 
 	g_accelerationStructure.Reset();
-	g_bottomLevelAccelerationStructure[0].Reset();
-	g_bottomLevelAccelerationStructure[1].Reset();
+	g_bottomLevelAccelerationStructure[0].accelerationStructure.Reset();
+	g_bottomLevelAccelerationStructure[1].accelerationStructure.Reset();
+	g_bottomLevelAccelerationStructure[2].accelerationStructure.Reset();
+	g_bottomLevelAccelerationStructure[3].accelerationStructure.Reset();
 
 	g_topLevelAccelerationStructure.accelerationStructure.Reset();
 }
@@ -1044,19 +1127,28 @@ void DXRSample::BuildShaderTables()
 		struct RootArguments {
 			MaterialConstants cb;
 			UINT64 handle;
-		} rootArguments1,rootArguments2, rootArguments3;
+		} rootArguments1,rootArguments2, rootArguments3, rootArguments4;
 		MaterialConstants tmp;
-		tmp.DiffuseAlbedo = g_Materials["triangle"].get()->DiffuseAlbedo;
-		tmp.FresnelR0 = g_Materials["triangle"].get()->FresnelR0;
-		tmp.Roughness = 0.3f;
+		tmp.DiffuseAlbedo = g_Materials["cube"].get()->DiffuseAlbedo;
+		tmp.FresnelR0 = g_Materials["cube"].get()->FresnelR0;
+		tmp.Roughness = g_Materials["cube"].get()->Roughness;
 		rootArguments1.cb = tmp;
 		rootArguments1.handle = m_localIndexBufferBox.gpuDescriptorHandle.ptr;
 
-		tmp.DiffuseAlbedo.x = 1.0f;		tmp.DiffuseAlbedo.y = 1.0f;		tmp.DiffuseAlbedo.z = 1.0f;
-		tmp.Roughness = 1.0f;
+		tmp.DiffuseAlbedo = g_Materials["sphere"].get()->DiffuseAlbedo;
+		tmp.Roughness = g_Materials["sphere"].get()->Roughness;
 		rootArguments2.cb = tmp;
-		rootArguments2.handle = m_localIndexBufferGrid.gpuDescriptorHandle.ptr;
+		rootArguments2.handle = m_localIndexBufferSphere.gpuDescriptorHandle.ptr;
 
+		tmp.DiffuseAlbedo = g_Materials["cylinder"].get()->DiffuseAlbedo;
+		tmp.Roughness = g_Materials["cylinder"].get()->Roughness;
+		rootArguments3.cb = tmp;
+		rootArguments3.handle = m_localIndexBufferCylinder.gpuDescriptorHandle.ptr;
+
+		tmp.DiffuseAlbedo = g_Materials["grid"].get()->DiffuseAlbedo;
+		tmp.Roughness = g_Materials["grid"].get()->Roughness;
+		rootArguments4.cb = tmp;
+		rootArguments4.handle = m_localIndexBufferGrid.gpuDescriptorHandle.ptr;
 
 #define ALIGN(alignment, num) ((((num) + alignment - 1) / alignment) * alignment)
 		const UINT offsetToDescriptorHandle = ALIGN(sizeof(D3D12_GPU_DESCRIPTOR_HANDLE), shaderIdentifierSize);
@@ -1065,13 +1157,15 @@ void DXRSample::BuildShaderTables()
 		const UINT shaderRecordSizeInBytes = ALIGN(D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT, offsetToMaterialConstants + sizeof(RootArguments));
 
 
-		UINT numShaderRecords = 3;
+		UINT numShaderRecords = 4;
 		UINT shaderRecordSize = shaderRecordSizeInBytes;
 		g_hitGroupShaderTableStrideInBytes = shaderRecordSize;
 		ShaderTable hitGroupShaderTable(device.Get(), numShaderRecords, shaderRecordSize, L"HitGroupShaderTable");
 		hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments1, sizeof(rootArguments1)));
 		hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments2, sizeof(rootArguments2)));
-		hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments1, sizeof(rootArguments1)));
+		hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments3, sizeof(rootArguments3)));
+		hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments4, sizeof(rootArguments4)));
+
 		m_hitGroupShaderTable = hitGroupShaderTable.GetResource();
 	}
 }
@@ -1283,14 +1377,14 @@ AccelerationStructureBuffers DXRSample::BuildBottomLevelAccelerationStructure()
 
 	D3D12_RAYTRACING_GEOMETRY_DESC geoDesc;
 	geometryDesc[0].Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-	geometryDesc[0].Triangles.IndexBuffer = geometry->IndexBufferGPU->GetGPUVirtualAddress() + geometry->DrawArgs["triangle"].StartIndexLocation * sizeof(UINT16);
-	geometryDesc[0].Triangles.IndexCount = geometry->DrawArgs["triangle"].IndexCount;
+	geometryDesc[0].Triangles.IndexBuffer = geometry->IndexBufferGPU->GetGPUVirtualAddress() + geometry->DrawArgs["cube"].StartIndexLocation * sizeof(UINT16);
+	geometryDesc[0].Triangles.IndexCount = geometry->DrawArgs["cube"].IndexCount;
 	geometryDesc[0].Triangles.IndexFormat = geometry->IndexFormat;
 	geometryDesc[0].Triangles.Transform3x4 = 0;
 	geometryDesc[0].Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
 
-	geometryDesc[0].Triangles.VertexCount = geometry->DrawArgs["triangle"].VertexCount;
-	geometryDesc[0].Triangles.VertexBuffer.StartAddress = geometry->VertexBufferGPU->GetGPUVirtualAddress() + geometry->DrawArgs["triangle"].StartVertexLocation * sizeof(VertexNormal);
+	geometryDesc[0].Triangles.VertexCount = geometry->DrawArgs["cube"].VertexCount;
+	geometryDesc[0].Triangles.VertexBuffer.StartAddress = geometry->VertexBufferGPU->GetGPUVirtualAddress() + geometry->DrawArgs["cube"].StartVertexLocation * sizeof(VertexNormal);
 	geometryDesc[0].Triangles.VertexBuffer.StrideInBytes = geometry->VertexByteStride;
 	// Mark the geometry as opaque. 
 	// PERFORMANCE TIP: mark geometry as opaque whenever applicable as it can enable important ray processing optimizations.
@@ -1382,125 +1476,6 @@ AccelerationStructureBuffers DXRSample::BuildBottomLevelAccelerationStructure()
 }
 
 
-AccelerationStructureBuffers DXRSample::BuildBottomLevelAccelerationStructure(uint32_t numGeometries)
-{
-	auto device = Application::Get().GetDevice();
-	auto geometry = g_Geometries.begin()->second.get();
-
-	std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geometryDesc;
-	geometryDesc.resize(1);
-	//for (size_t i = 0; i < numGeometries; i++)
-	//{
-	//	geometryDesc[i].Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-	//	geometryDesc[i].Triangles.IndexBuffer = geometry->IndexBufferGPU->GetGPUVirtualAddress();
-	//	geometryDesc[i].Triangles.IndexCount = geometry->DrawArgs["triangle"].IndexCount;
-	//	geometryDesc[i].Triangles.IndexFormat = geometry->IndexFormat;
-	//	geometryDesc[i].Triangles.Transform3x4 = 0;
-	//	geometryDesc[i].Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-
-	//	geometryDesc[i].Triangles.VertexCount = geometry->DrawArgs["triangle"].VertexCount;
-	//	geometryDesc[i].Triangles.VertexBuffer.StartAddress = geometry->VertexBufferGPU->GetGPUVirtualAddress();
-	//	geometryDesc[i].Triangles.VertexBuffer.StrideInBytes = geometry->VertexByteStride;
-	//	// Mark the geometry as opaque. 
-	//	// PERFORMANCE TIP: mark geometry as opaque whenever applicable as it can enable important ray processing optimizations.
-	//	// Note: When rays encounter opaque geometry an any hit shader will not be executed whether it is present or not.
-	//	geometryDesc[i].Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-	//}
-
-
-	int i = 0;
-	for (const auto& e : geometry->DrawArgs)
-	{
-		if (i >= numGeometries)
-			break;
-		D3D12_RAYTRACING_GEOMETRY_DESC geoDesc;
-		geometryDesc[i].Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-		geometryDesc[i].Triangles.IndexBuffer = m_indexBuffer.resource->GetGPUVirtualAddress() + e.second.StartIndexLocation * sizeof(uint16_t);
-		geometryDesc[i].Triangles.IndexCount = e.second.IndexCount;
-		geometryDesc[i].Triangles.IndexFormat = geometry->IndexFormat;
-		geometryDesc[i].Triangles.Transform3x4 = 0;
-		geometryDesc[i].Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-
-		geometryDesc[i].Triangles.VertexCount = e.second.VertexCount;
-		geometryDesc[i].Triangles.VertexBuffer.StartAddress = m_vertexBuffer.resource->GetGPUVirtualAddress() + e.second.StartVertexLocation * geometry->VertexByteStride;
-		geometryDesc[i].Triangles.VertexBuffer.StrideInBytes = geometry->VertexByteStride;
-		// Mark the geometry as opaque. 
-		// PERFORMANCE TIP: mark geometry as opaque whenever applicable as it can enable important ray processing optimizations.
-		// Note: When rays encounter opaque geometry an any hit shader will not be executed whether it is present or not.
-		geometryDesc[i].Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-		
-		i++;
-	}
-
-
-
-
-	// Get required sizes for an acceleration structure.
-	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
-
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& bottomLevelInputs = asDesc.Inputs;
-	bottomLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-	bottomLevelInputs.Flags = buildFlags;
-	bottomLevelInputs.NumDescs = 1;
-	bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-	bottomLevelInputs.pGeometryDescs = geometryDesc.data();
-
-
-	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
-	if (g_raytracingAPI == RaytracingAPI::FallbackLayer)
-	{
-		g_fallbackDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
-	}
-	else // DirectX Ray-tracing
-	{
-		g_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
-	}
-	ThrowifFailed(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
-
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> scratchResource;
-	Microsoft::WRL::ComPtr<ID3D12Resource> bottomLevelAL;
-
-	AllocateUAVBuffer(device.Get(), bottomLevelPrebuildInfo.ScratchDataSizeInBytes, scratchResource.GetAddressOf(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResource");
-
-	{
-		D3D12_RESOURCE_STATES initialResourceState;
-		if (g_raytracingAPI == RaytracingAPI::FallbackLayer)
-		{
-			initialResourceState = g_fallbackDevice->GetAccelerationStructureResourceState();
-		}
-		else // DirectX Ray-tracing
-		{
-			initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-		}
-		AllocateUAVBuffer(device.Get(), bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, bottomLevelAL.GetAddressOf(), initialResourceState, L"BottomLevelAccelerationStructure");
-	}
-
-
-	{
-		asDesc.DestAccelerationStructureData = bottomLevelAL->GetGPUVirtualAddress();
-		asDesc.ScratchAccelerationStructureData = scratchResource->GetGPUVirtualAddress();
-	}
-
-	if (g_raytracingAPI == RaytracingAPI::FallbackLayer)
-	{
-		ID3D12DescriptorHeap* pDescriptorHeaps[] = { g_CBVHeap.Get() };
-		g_fallbackCommandList->SetDescriptorHeaps(ARRAYSIZE(pDescriptorHeaps), pDescriptorHeaps);
-		g_fallbackCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
-	}
-	else
-	{
-		g_dxrCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
-	}
-
-	AccelerationStructureBuffers bottomLevelASBuffers;
-	bottomLevelASBuffers.accelerationStructure = bottomLevelAL;
-	bottomLevelASBuffers.scratch = scratchResource;
-	bottomLevelASBuffers.ResultDataMaxSizeInBytes = bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes;
-
-	return bottomLevelASBuffers;
-}
 
 
 AccelerationStructureBuffers DXRSample::BuildBottomLevelAccelerationStructure(uint32_t numGeometries, std::string name)
@@ -1511,48 +1486,7 @@ AccelerationStructureBuffers DXRSample::BuildBottomLevelAccelerationStructure(ui
 
 	std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geometryDesc;
 	geometryDesc.resize(1);
-	//for (size_t i = 0; i < numGeometries; i++)
-	//{
-	//	geometryDesc[i].Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-	//	geometryDesc[i].Triangles.IndexBuffer = geometry->IndexBufferGPU->GetGPUVirtualAddress();
-	//	geometryDesc[i].Triangles.IndexCount = geometry->DrawArgs["triangle"].IndexCount;
-	//	geometryDesc[i].Triangles.IndexFormat = geometry->IndexFormat;
-	//	geometryDesc[i].Triangles.Transform3x4 = 0;
-	//	geometryDesc[i].Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
 
-	//	geometryDesc[i].Triangles.VertexCount = geometry->DrawArgs["triangle"].VertexCount;
-	//	geometryDesc[i].Triangles.VertexBuffer.StartAddress = geometry->VertexBufferGPU->GetGPUVirtualAddress();
-	//	geometryDesc[i].Triangles.VertexBuffer.StrideInBytes = geometry->VertexByteStride;
-	//	// Mark the geometry as opaque. 
-	//	// PERFORMANCE TIP: mark geometry as opaque whenever applicable as it can enable important ray processing optimizations.
-	//	// Note: When rays encounter opaque geometry an any hit shader will not be executed whether it is present or not.
-	//	geometryDesc[i].Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-	//}
-
-
-	//int i = 0;
-	//for (const auto& e : geometry->DrawArgs)
-	//{
-	//	if (i >= numGeometries)
-	//		break;
-	//	D3D12_RAYTRACING_GEOMETRY_DESC geoDesc;
-	//	geometryDesc[i].Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-	//	geometryDesc[i].Triangles.IndexBuffer = m_indexBuffer.resource->GetGPUVirtualAddress() + e.second.StartIndexLocation * sizeof(uint16_t);
-	//	geometryDesc[i].Triangles.IndexCount = e.second.IndexCount;
-	//	geometryDesc[i].Triangles.IndexFormat = geometry->IndexFormat;
-	//	geometryDesc[i].Triangles.Transform3x4 = 0;
-	//	geometryDesc[i].Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-
-	//	geometryDesc[i].Triangles.VertexCount = e.second.VertexCount;
-	//	geometryDesc[i].Triangles.VertexBuffer.StartAddress = m_vertexBuffer.resource->GetGPUVirtualAddress() + e.second.StartVertexLocation * geometry->VertexByteStride;
-	//	geometryDesc[i].Triangles.VertexBuffer.StrideInBytes = geometry->VertexByteStride;
-	//	// Mark the geometry as opaque. 
-	//	// PERFORMANCE TIP: mark geometry as opaque whenever applicable as it can enable important ray processing optimizations.
-	//	// Note: When rays encounter opaque geometry an any hit shader will not be executed whether it is present or not.
-	//	geometryDesc[i].Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-	//	
-	//	i++;
-	//}
 
 	auto e = geometry->DrawArgs[name];
 		D3D12_RAYTRACING_GEOMETRY_DESC geoDesc;
@@ -1640,16 +1574,16 @@ AccelerationStructureBuffers DXRSample::BuildBottomLevelAccelerationStructure(ui
 	return bottomLevelASBuffers;
 }
 
-AccelerationStructureBuffers DXRSample::CreateTopLevelAccelerationStructure(AccelerationStructureBuffers bottomLevelAS[2])
+AccelerationStructureBuffers DXRSample::CreateTopLevelAccelerationStructure(AccelerationStructureBuffers bottomLevelAS[4])
 {
 	auto device = Application::Get().GetDevice();
-	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& topLevelInputs = asDesc.Inputs;
 	topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 	topLevelInputs.Flags = buildFlags;
-	topLevelInputs.NumDescs = 2;
+	topLevelInputs.NumDescs = 4;
 	topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 	topLevelInputs.pGeometryDescs = nullptr;
 
@@ -1683,40 +1617,57 @@ AccelerationStructureBuffers DXRSample::CreateTopLevelAccelerationStructure(Acce
 
 	}
 
-
-
+	
 
 	ComPtr<ID3D12Resource> instanceResource;
 	if (g_raytracingAPI == RaytracingAPI::FallbackLayer)
 	{
 		D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC* instanceDescs;
 
-		AllocateUploadBuffer(device.Get(), &instanceDescs, sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC) * 2, &instanceResource, L"InstanceDescs");
+		AllocateUploadBuffer(device.Get(), &instanceDescs, sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC) * 4, &instanceResource, L"InstanceDescs");
 		instanceResource->Map(0, nullptr, (void**)& instanceDescs);
-		ZeroMemory(instanceDescs, sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC) * 2);
+		ZeroMemory(instanceDescs, sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC) * 4);
 		WRAPPED_GPU_POINTER blas[] = {
 			CreateFallbackWrappedPointer(bottomLevelAS[0].accelerationStructure.Get(), static_cast<UINT>(bottomLevelAS[0].ResultDataMaxSizeInBytes) / sizeof(UINT32)),
-			CreateFallbackWrappedPointer(bottomLevelAS[1].accelerationStructure.Get(), static_cast<UINT>(bottomLevelAS[1].ResultDataMaxSizeInBytes) / sizeof(UINT32))
-		};
-		
-		for (size_t i = 0; i < 1; i++)
-		{
-			instanceDescs[i].InstanceID = i;
-			instanceDescs[i].InstanceMask = 0xFF;
-			instanceDescs[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-			instanceDescs[i].InstanceContributionToHitGroupIndex = 0; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
-			instanceDescs[i].AccelerationStructure = blas[0];
-			XMMATRIX world = XMLoadFloat4x4(&g_AllOpaqueItems.at(i)->WorldMatrix);
-			memcpy(instanceDescs[i].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[i].Transform));
+			CreateFallbackWrappedPointer(bottomLevelAS[1].accelerationStructure.Get(), static_cast<UINT>(bottomLevelAS[1].ResultDataMaxSizeInBytes) / sizeof(UINT32)),
+			CreateFallbackWrappedPointer(bottomLevelAS[2].accelerationStructure.Get(), static_cast<UINT>(bottomLevelAS[2].ResultDataMaxSizeInBytes) / sizeof(UINT32)),
+			CreateFallbackWrappedPointer(bottomLevelAS[3].accelerationStructure.Get(), static_cast<UINT>(bottomLevelAS[3].ResultDataMaxSizeInBytes) / sizeof(UINT32))
 
-		}
-		instanceDescs[1].InstanceID = g_AllOpaqueItems.at(1)->ObjCBIndex;
+		};
+		memcpy(mBLAS, blas, sizeof(WRAPPED_GPU_POINTER) * 4);
+
+		instanceDescs[0].InstanceID = 0;
+		instanceDescs[0].InstanceMask = 0xFF;
+		instanceDescs[0].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+		instanceDescs[0].InstanceContributionToHitGroupIndex = 0; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+		instanceDescs[0].AccelerationStructure = blas[0];
+		XMMATRIX world = XMLoadFloat4x4(&g_AllOpaqueItems.at(RenderItemsParam::cube0)->WorldMatrix);
+		memcpy(instanceDescs[0].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[0].Transform));
+
+		
+		instanceDescs[1].InstanceID = 1;
 		instanceDescs[1].InstanceMask = 0xFF;
 		instanceDescs[1].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-		instanceDescs[1].InstanceContributionToHitGroupIndex = 2; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+		instanceDescs[1].InstanceContributionToHitGroupIndex = 1; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
 		instanceDescs[1].AccelerationStructure = blas[1];
-		XMMATRIX world = XMLoadFloat4x4(&g_AllOpaqueItems.at(RenderItemsParam::cube1)->WorldMatrix);
+		world = XMLoadFloat4x4(&g_AllOpaqueItems.at(RenderItemsParam::sphere)->WorldMatrix);
 		memcpy(instanceDescs[1].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[1].Transform));
+
+		instanceDescs[2].InstanceID = 2;
+		instanceDescs[2].InstanceMask = 0xFF;
+		instanceDescs[2].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+		instanceDescs[2].InstanceContributionToHitGroupIndex = 2; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+		instanceDescs[2].AccelerationStructure = blas[2];
+		world = XMLoadFloat4x4(&g_AllOpaqueItems.at(RenderItemsParam::cylinder)->WorldMatrix);
+		memcpy(instanceDescs[2].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[2].Transform));
+
+		instanceDescs[3].InstanceID = 3;
+		instanceDescs[3].InstanceMask = 0xFF;
+		instanceDescs[3].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+		instanceDescs[3].InstanceContributionToHitGroupIndex = 3; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+		instanceDescs[3].AccelerationStructure = blas[3];
+		world = XMLoadFloat4x4(&g_AllOpaqueItems.at(RenderItemsParam::plane)->WorldMatrix);
+		memcpy(instanceDescs[3].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[3].Transform));
 
 		instanceResource->Unmap(0, nullptr);
 	}
@@ -1755,6 +1706,7 @@ AccelerationStructureBuffers DXRSample::CreateTopLevelAccelerationStructure(Acce
 	{
 		UINT numBufferElements = static_cast<UINT>(topLevelPrebuildInfo.ResultDataMaxSizeInBytes) / sizeof(UINT32);
 		g_fallbackTopLevelAccelerationStructrePointer = CreateFallbackWrappedPointer(TopLevelAL.Get(), numBufferElements);
+		memcpy(&mAccelerationWrapperPointer.toplevel, &g_fallbackTopLevelAccelerationStructrePointer, sizeof(WRAPPED_GPU_POINTER));
 	}
 
 	{
@@ -1774,6 +1726,7 @@ AccelerationStructureBuffers DXRSample::CreateTopLevelAccelerationStructure(Acce
 		g_dxrCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
 	}
 	
+
 	AccelerationStructureBuffers topLevelASBuffers;
 	topLevelASBuffers.accelerationStructure = TopLevelAL;
 	topLevelASBuffers.scratch = scratchResource;
@@ -1782,18 +1735,17 @@ AccelerationStructureBuffers DXRSample::CreateTopLevelAccelerationStructure(Acce
 
 	return topLevelASBuffers;
 }
-AccelerationStructureBuffers DXRSample::UpdateTopLevelAccelerationStructure(AccelerationStructureBuffers bottomLevelAS[2], AccelerationStructureBuffers topLevel)
+void DXRSample::UpdateTopLevelAccelerationStructure(AccelerationStructureBuffers bottomLevelAS[4], AccelerationStructureBuffers topLevel, ID3D12GraphicsCommandList* commandList)
 {
 	auto device = Application::Get().GetDevice();
-	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& topLevelInputs = asDesc.Inputs;
 	topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 	topLevelInputs.Flags = buildFlags;
-	topLevelInputs.NumDescs = 2;
+	topLevelInputs.NumDescs = 4;
 	topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
-	topLevelInputs.pGeometryDescs = nullptr;
 
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo = {};
 	if (g_raytracingAPI == RaytracingAPI::FallbackLayer)
@@ -1807,24 +1759,11 @@ AccelerationStructureBuffers DXRSample::UpdateTopLevelAccelerationStructure(Acce
 	ThrowifFailed(topLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
 
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> scratchResource;
-	Microsoft::WRL::ComPtr<ID3D12Resource> TopLevelAL;
-	AllocateUAVBuffer(device.Get(), topLevelPrebuildInfo.ScratchDataSizeInBytes, scratchResource.GetAddressOf(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResource");
 
-	{
-		D3D12_RESOURCE_STATES initialResourceState;
-		if (g_raytracingAPI == RaytracingAPI::FallbackLayer)
-		{
-			initialResourceState = g_fallbackDevice->GetAccelerationStructureResourceState();
-		}
-		else // DirectX Ray-tracing
-		{
-			initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-		}
-		AllocateUAVBuffer(device.Get(), topLevelPrebuildInfo.ResultDataMaxSizeInBytes, TopLevelAL.GetAddressOf(), initialResourceState, L"TopLevelAccelerationStructure");
-
-	}
-
+	D3D12_RESOURCE_BARRIER uavBarrier = {};
+	uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	uavBarrier.UAV.pResource = topLevel.accelerationStructure.Get();
+	commandList->ResourceBarrier(1, &uavBarrier);
 
 
 
@@ -1833,32 +1772,43 @@ AccelerationStructureBuffers DXRSample::UpdateTopLevelAccelerationStructure(Acce
 	{
 		D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC* instanceDescs;
 
-		AllocateUploadBuffer(device.Get(), &instanceDescs, sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC) * 2, &instanceResource, L"InstanceDescs");
+		AllocateUploadBuffer(device.Get(), &instanceDescs, sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC) * 4, &instanceResource, L"InstanceDescs");
 		instanceResource->Map(0, nullptr, (void**)& instanceDescs);
-		ZeroMemory(instanceDescs, sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC) * 2);
-		WRAPPED_GPU_POINTER blas[] = {
-			CreateFallbackWrappedPointer(bottomLevelAS[0].accelerationStructure.Get(), static_cast<UINT>(bottomLevelAS[0].ResultDataMaxSizeInBytes) / sizeof(UINT32)),
-			CreateFallbackWrappedPointer(bottomLevelAS[1].accelerationStructure.Get(), static_cast<UINT>(bottomLevelAS[1].ResultDataMaxSizeInBytes) / sizeof(UINT32))
-		};
+		ZeroMemory(instanceDescs, sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC) * 4);
+		WRAPPED_GPU_POINTER* blas = mBLAS;
 
-		for (size_t i = 0; i < 1; i++)
-		{
-			instanceDescs[i].InstanceID = i;
-			instanceDescs[i].InstanceMask = 0xFF;
-			instanceDescs[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-			instanceDescs[i].InstanceContributionToHitGroupIndex = 0; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
-			instanceDescs[i].AccelerationStructure = blas[0];
-			XMMATRIX world = XMLoadFloat4x4(&g_AllOpaqueItems.at(i)->WorldMatrix);
-			memcpy(instanceDescs[i].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[i].Transform));
+		instanceDescs[0].InstanceID = 0;
+		instanceDescs[0].InstanceMask = 0xFF;
+		instanceDescs[0].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+		instanceDescs[0].InstanceContributionToHitGroupIndex = 0; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+		instanceDescs[0].AccelerationStructure = blas[0];
+		XMMATRIX world = XMLoadFloat4x4(&g_AllOpaqueItems.at(RenderItemsParam::cube0)->WorldMatrix);
+		memcpy(instanceDescs[0].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[0].Transform));
 
-		}
-		instanceDescs[1].InstanceID = g_AllOpaqueItems.at(1)->ObjCBIndex;
+
+		instanceDescs[1].InstanceID = 1;
 		instanceDescs[1].InstanceMask = 0xFF;
 		instanceDescs[1].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-		instanceDescs[1].InstanceContributionToHitGroupIndex = 2; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+		instanceDescs[1].InstanceContributionToHitGroupIndex = 1; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
 		instanceDescs[1].AccelerationStructure = blas[1];
-		XMMATRIX world = XMLoadFloat4x4(&g_AllOpaqueItems.at(RenderItemsParam::cube1)->WorldMatrix);
+		world = XMLoadFloat4x4(&g_AllOpaqueItems.at(RenderItemsParam::sphere)->WorldMatrix);
 		memcpy(instanceDescs[1].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[1].Transform));
+
+		instanceDescs[2].InstanceID = 2;
+		instanceDescs[2].InstanceMask = 0xFF;
+		instanceDescs[2].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+		instanceDescs[2].InstanceContributionToHitGroupIndex = 2; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+		instanceDescs[2].AccelerationStructure = blas[2];
+		world = XMLoadFloat4x4(&g_AllOpaqueItems.at(RenderItemsParam::cylinder)->WorldMatrix);
+		memcpy(instanceDescs[2].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[2].Transform));
+
+		instanceDescs[3].InstanceID = 3;
+		instanceDescs[3].InstanceMask = 0xFF;
+		instanceDescs[3].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+		instanceDescs[3].InstanceContributionToHitGroupIndex = 3; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+		instanceDescs[3].AccelerationStructure = blas[3];
+		world = XMLoadFloat4x4(&g_AllOpaqueItems.at(RenderItemsParam::plane)->WorldMatrix);
+		memcpy(instanceDescs[3].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[3].Transform));
 
 		instanceResource->Unmap(0, nullptr);
 	}
@@ -1870,39 +1820,73 @@ AccelerationStructureBuffers DXRSample::UpdateTopLevelAccelerationStructure(Acce
 		instanceResource->Map(0, nullptr, (void**)& instanceDescs);
 		ZeroMemory(instanceDescs, sizeof(D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC) * 2);
 
-		for (size_t i = 0; i < i; i++)
-		{
-			instanceDescs[i].InstanceID = i;
-			instanceDescs[i].InstanceMask = 0xFF;
-			instanceDescs[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-			instanceDescs[i].InstanceContributionToHitGroupIndex = 0; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
-			instanceDescs[i].AccelerationStructure = bottomLevelAS[0].accelerationStructure->GetGPUVirtualAddress();
-			XMMATRIX world = XMLoadFloat4x4(&g_AllOpaqueItems.at(i)->WorldMatrix);
-			memcpy(instanceDescs[i].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[i].Transform));
+		instanceDescs[0].InstanceID = 0;
+		instanceDescs[0].InstanceMask = 0xFF;
+		instanceDescs[0].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+		instanceDescs[0].InstanceContributionToHitGroupIndex = 0; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+		instanceDescs[0].AccelerationStructure = bottomLevelAS[0].accelerationStructure->GetGPUVirtualAddress();
+		XMMATRIX world = XMLoadFloat4x4(&g_AllOpaqueItems.at(RenderItemsParam::cube0)->WorldMatrix);
+		memcpy(instanceDescs[0].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[0].Transform));
 
-		}
-		//instanceDescs[2].InstanceID = g_AllOpaqueItems.at(2)->ObjCBIndex;
-		//instanceDescs[2].InstanceMask = 0xFF;
-		//instanceDescs[2].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-		//instanceDescs[2].InstanceContributionToHitGroupIndex = 2; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
-		//instanceDescs[2].AccelerationStructure = bottomLevelAS[1].accelerationStructure->GetGPUVirtualAddress();
-		//XMMATRIX world = XMLoadFloat4x4(&g_AllOpaqueItems.at(2)->WorldMatrix);
-		//memcpy(instanceDescs[2].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[2].Transform));
+
+		instanceDescs[1].InstanceID = 1;
+		instanceDescs[1].InstanceMask = 0xFF;
+		instanceDescs[1].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+		instanceDescs[1].InstanceContributionToHitGroupIndex = 1; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+		instanceDescs[1].AccelerationStructure = bottomLevelAS[1].accelerationStructure->GetGPUVirtualAddress();
+		world = XMLoadFloat4x4(&g_AllOpaqueItems.at(RenderItemsParam::sphere)->WorldMatrix);
+		memcpy(instanceDescs[1].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[1].Transform));
+
+		instanceDescs[2].InstanceID = 2;
+		instanceDescs[2].InstanceMask = 0xFF;
+		instanceDescs[2].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+		instanceDescs[2].InstanceContributionToHitGroupIndex = 2; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+		instanceDescs[2].AccelerationStructure = bottomLevelAS[2].accelerationStructure->GetGPUVirtualAddress();
+		world = XMLoadFloat4x4(&g_AllOpaqueItems.at(RenderItemsParam::cylinder)->WorldMatrix);
+		memcpy(instanceDescs[2].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[2].Transform));
+
+		instanceDescs[3].InstanceID = 3;
+		instanceDescs[3].InstanceMask = 0xFF;
+		instanceDescs[3].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+		instanceDescs[3].InstanceContributionToHitGroupIndex = 3; // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+		instanceDescs[3].AccelerationStructure = bottomLevelAS[3].accelerationStructure->GetGPUVirtualAddress();
+		world = XMLoadFloat4x4(&g_AllOpaqueItems.at(RenderItemsParam::plane)->WorldMatrix);
+		memcpy(instanceDescs[3].Transform, &XMMatrixTranspose(world), sizeof(instanceDescs[3].Transform));
+
 
 		instanceResource->Unmap(0, nullptr);
 	}
 
-	// Create a wrapped pointer to the acceleration structure.
+	 //Create a wrapped pointer to the acceleration structure.
 	if (g_raytracingAPI == RaytracingAPI::FallbackLayer)
 	{
 		UINT numBufferElements = static_cast<UINT>(topLevelPrebuildInfo.ResultDataMaxSizeInBytes) / sizeof(UINT32);
-		g_fallbackTopLevelAccelerationStructrePointer = CreateFallbackWrappedPointer(TopLevelAL.Get(), numBufferElements);
+		auto device = Application::Get().GetDevice();
+
+		D3D12_UNORDERED_ACCESS_VIEW_DESC rawBufferUavDesc = {};
+		rawBufferUavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+		rawBufferUavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
+		rawBufferUavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+		rawBufferUavDesc.Buffer.NumElements = numBufferElements;
+
+		D3D12_CPU_DESCRIPTOR_HANDLE bottomLevelDescriptor;
+
+		// Only compute fallback requires a valid descriptor index when creating a wrapped pointer.
+		UINT descriptorHeapIndex = 0;
+		if (!g_fallbackDevice->UsingRaytracingDriver())
+		{
+			descriptorHeapIndex = AllocateDescriptor(&bottomLevelDescriptor, g_fallbackTopLevelAccelerationStructrePointer.EmulatedGpuPtr.DescriptorHeapIndex);
+			device->CreateUnorderedAccessView(topLevel.accelerationStructure.Get(), nullptr, &rawBufferUavDesc, bottomLevelDescriptor);
+		}
+		g_fallbackTopLevelAccelerationStructrePointer = g_fallbackDevice->GetWrappedPointerSimple(descriptorHeapIndex, topLevel.accelerationStructure->GetGPUVirtualAddress());
 	}
 
 	{
-		asDesc.DestAccelerationStructureData = TopLevelAL->GetGPUVirtualAddress();
+		asDesc.DestAccelerationStructureData = topLevel.accelerationStructure->GetGPUVirtualAddress();
 		asDesc.Inputs.InstanceDescs = instanceResource->GetGPUVirtualAddress();
-		asDesc.ScratchAccelerationStructureData = scratchResource->GetGPUVirtualAddress();
+		asDesc.ScratchAccelerationStructureData = topLevel.scratch->GetGPUVirtualAddress();
+		asDesc.SourceAccelerationStructureData = topLevel.accelerationStructure->GetGPUVirtualAddress();
+		asDesc.Inputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
 	}
 	// Build acceleration structure.
 	if (g_raytracingAPI == RaytracingAPI::FallbackLayer)
@@ -1916,13 +1900,13 @@ AccelerationStructureBuffers DXRSample::UpdateTopLevelAccelerationStructure(Acce
 		g_dxrCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
 	}
 
-	AccelerationStructureBuffers topLevelASBuffers;
-	topLevelASBuffers.accelerationStructure = TopLevelAL;
-	topLevelASBuffers.scratch = scratchResource;
-	topLevelASBuffers.instanceDesc = instanceResource;
-	topLevelASBuffers.ResultDataMaxSizeInBytes = topLevelPrebuildInfo.ResultDataMaxSizeInBytes;
+	g_topLevelAccelerationStructure.instanceDesc = instanceResource;
 
-	return topLevelASBuffers;
+	D3D12_RESOURCE_BARRIER uavBarrier1 = {};
+	uavBarrier1.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	uavBarrier1.UAV.pResource = topLevel.accelerationStructure.Get();
+	commandList->ResourceBarrier(1, &uavBarrier1);
+
 }
 
 // Build acceleration structures needed for ray-tracing.
@@ -1938,16 +1922,22 @@ void DXRSample::BuildAccelerationStructures()
 	////Reset the command list for the acceleration structure construction.
 	//commandList->Close();
 	//commandList->Reset(commandAllocator, nullptr);
-	AccelerationStructureBuffers tmpbot[2],tmptop;
-	tmpbot[0] = BuildBottomLevelAccelerationStructure();
-	tmpbot[1] = BuildBottomLevelAccelerationStructure(1,"triangle");
-	g_bottomLevelAccelerationStructure[0] = tmpbot[0].accelerationStructure;
-	g_bottomLevelAccelerationStructure[1] = tmpbot[1].accelerationStructure;
+	AccelerationStructureBuffers tmpbot[4],tmptop;
+	tmpbot[0] = BuildBottomLevelAccelerationStructure(1, "cube");
+	tmpbot[1] = BuildBottomLevelAccelerationStructure(1, "sphere");
+	tmpbot[2] = BuildBottomLevelAccelerationStructure(1, "cylinder");
+	tmpbot[3] = BuildBottomLevelAccelerationStructure(1, "grid");
+	g_bottomLevelAccelerationStructure[0] = tmpbot[0];
+	g_bottomLevelAccelerationStructure[1] = tmpbot[1];
+	g_bottomLevelAccelerationStructure[2] = tmpbot[2];
+	g_bottomLevelAccelerationStructure[3] = tmpbot[3];
 
 
-	D3D12_RESOURCE_BARRIER resourceBarriers[2];
+	D3D12_RESOURCE_BARRIER resourceBarriers[4];
 	resourceBarriers[0] = CD3DX12_RESOURCE_BARRIER::UAV(tmpbot[0].accelerationStructure.Get());
 	resourceBarriers[1] = CD3DX12_RESOURCE_BARRIER::UAV(tmpbot[1].accelerationStructure.Get());
+	resourceBarriers[2] = CD3DX12_RESOURCE_BARRIER::UAV(tmpbot[2].accelerationStructure.Get());
+	resourceBarriers[3] = CD3DX12_RESOURCE_BARRIER::UAV(tmpbot[3].accelerationStructure.Get());
 
 	commandList->ResourceBarrier(1, resourceBarriers);
 
@@ -2061,7 +2051,6 @@ void DXRSample::DoRaytracing(ID3D12GraphicsCommandList* commandList)
 		passCBHandle.Offset(passCBIndex, Application::Get().GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
 		commandList->SetComputeRootDescriptorTable(RaytraceGlobalRootSignatureParams::ScenceConstantBufferSlot, passCBHandle);
 
-		commandList->SetComputeRootDescriptorTable(RaytraceGlobalRootSignatureParams::VertexBufferSlot, m_indexBuffer.gpuDescriptorHandle);
 
 		g_fallbackCommandList->SetTopLevelAccelerationStructure(RaytraceGlobalRootSignatureParams::AccelerationStructureSlot, g_fallbackTopLevelAccelerationStructrePointer);
 		DispatchRays(g_fallbackCommandList.Get(), g_fallbackStateObject.Get(), &dispatchDesc);
@@ -2085,8 +2074,18 @@ void DXRSample::UpdateForSizeChange(UINT width, UINT height)
 
 void DXRSample::UpdateUI()
 {	
-	auto e = g_AllRenderItems.at(RenderItemsParam::cube1).get();
+	auto e = g_AllRenderItems.at(RenderItemsParam::cube0).get();
 	XMStoreFloat4x4(&e->WorldMatrix,  XMMatrixTranslation(uiData.CubePosition[0], uiData.CubePosition[1], uiData.CubePosition[2]));
+	e->NumFramesDirty++;
+
+	e = g_AllRenderItems.at(RenderItemsParam::plane).get();
+	XMStoreFloat4x4(&e->WorldMatrix, XMMatrixTranslation(uiData.PlanePosition[0], uiData.PlanePosition[1], uiData.PlanePosition[2]));
+	e->NumFramesDirty++;
+	e = g_AllRenderItems.at(RenderItemsParam::sphere).get();
+	XMStoreFloat4x4(&e->WorldMatrix, XMMatrixTranslation(uiData.SpherePosition[0], uiData.SpherePosition[1], uiData.SpherePosition[2]));
+	e->NumFramesDirty++;
+	e = g_AllRenderItems.at(RenderItemsParam::cylinder).get();
+	XMStoreFloat4x4(&e->WorldMatrix, XMMatrixTranslation(uiData.CylinderPosition[0], uiData.CylinderPosition[1], uiData.CylinderPosition[2]));
 	e->NumFramesDirty++;
 }
 
@@ -2139,6 +2138,8 @@ void DXRSample::UpdateMainPassCB(UpdateEventArgs& e)
 	g_MainPassCB.lightPosition = XMFLOAT3(uiData.Light0Position[0], uiData.Light0Position[1], uiData.Light0Position[2]);
 	g_MainPassCB.lightDiffuseColor = XMFLOAT4(uiData.Light0DiffuseColor[0], uiData.Light0DiffuseColor[1], uiData.Light0DiffuseColor[2], uiData.Light0DiffuseColor[3]);
 	g_MainPassCB.lightAmbientColor = XMFLOAT4(uiData.Light0AmbientColor[0], uiData.Light0AmbientColor[1], uiData.Light0AmbientColor[2], uiData.Light0AmbientColor[3]);
+	g_MainPassCB.lightPower = uiData.Light0Power;
+	g_MainPassCB.SpecularPower = uiData.Light0SpecularPower;
 	auto currPassCB = g_CurrFrameResource->PassCB.get();
 	currPassCB->CopyData(0, g_MainPassCB);
 }
@@ -2175,11 +2176,11 @@ void DXRSample::OnUpdate(UpdateEventArgs& e)
 	mEyePos.z = mRadius * sinf(mPhi)*sinf(mTheta);
 	mEyePos.y = mRadius * cosf(mPhi);
 
-	
-
+	mEyePos.x += mWASD.x;
+	mEyePos.y += mWASD.y;
 	// Build the view matrix.
 	XMVECTOR pos = XMVectorSet(mEyePos.x, mEyePos.y, mEyePos.z, 0.0f);
-	XMVECTOR target = { 0.0f,0.0f,0.0f,1.0f };
+	XMVECTOR target = XMLoadFloat4(&mWASD);
 	XMVECTOR right = { 1.0f, 0.0f, 0.0f, 0.0f };
 	XMVECTOR direction = XMVector4Normalize(target - pos);
 	//XMVECTOR up = XMVector3Normalize(XMVector3Cross(direction, right));
@@ -2230,9 +2231,14 @@ void DXRSample::ClearDepth(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> co
 
 void DXRSample::OnRender(RenderEventArgs& e)
 {
+
+	auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	auto commandList = commandQueue->GetCommandList();
 	super::OnRender(e);
 
-	
+
+	UpdateTopLevelAccelerationStructure(g_bottomLevelAccelerationStructure, g_topLevelAccelerationStructure, commandList.Get());
+
 
 	ImGui_ImplDX12_NewFrame();
 	ImGui_ImplWin32_NewFrame();
@@ -2253,10 +2259,12 @@ void DXRSample::OnRender(RenderEventArgs& e)
 		isWireFrameMode = !isWireFrameMode;
 	}
 	ImGui::BeginTabBar("Tab Bar");
-	if (ImGui::BeginTabItem("Camera", false))
+	if (ImGui::BeginTabItem("Enviroment", false))
 	{
-		ImGui::SliderFloat3("LightPosition", uiData.Light0Position, -500, +500);
-		ImGui::ColorPicker4("LightColor", uiData.Light0DiffuseColor);
+		ImGui::SliderFloat3("Light Position", uiData.Light0Position, -500, +500);
+		ImGui::ColorPicker4("Light Color", uiData.Light0DiffuseColor);
+		ImGui::SliderFloat("Light Power", &uiData.Light0Power, 0, 5);
+		ImGui::SliderFloat("LightSpecular Power", &uiData.Light0SpecularPower, 1, 200);
 
 		if (g_raster)
 			ImGui::Text("Raster");
@@ -2276,7 +2284,10 @@ void DXRSample::OnRender(RenderEventArgs& e)
 	}
 	if (ImGui::BeginTabItem("Objects"))
 	{
-		ImGui::SliderFloat3("GridPosition", uiData.CubePosition, -20, +20);
+		ImGui::SliderFloat3("CubePosition", uiData.CubePosition, -20, +20);
+		ImGui::SliderFloat3("GridPosition", uiData.PlanePosition, -20, +20);
+		ImGui::SliderFloat3("SpherePosition", uiData.SpherePosition, -20, +20);
+		ImGui::SliderFloat3("CylinderPosition", uiData.CylinderPosition, -20, +20);
 		ImGui::EndTabItem();
 	}
 	ImGui::EndTabBar();
@@ -2285,8 +2296,8 @@ void DXRSample::OnRender(RenderEventArgs& e)
 	ImGui::EndFrame();
 
 
-	auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
-	auto commandList = commandQueue->GetCommandList();
+
+
 
 	UINT currentBackBufferIndex = g_pWindow->GetCurrentBackBufferIndex();
 	auto backBuffer = g_pWindow->GetCurrentBackBuffer();
@@ -2373,7 +2384,20 @@ void DXRSample::OnRender(RenderEventArgs& e)
 		currentBackBufferIndex = g_pWindow->Present();
 
 		commandQueue->WaitForFenceValue(g_FenceValues[currentBackBufferIndex]);
-		//commandQueue->Flush();
+		commandQueue->Flush();
+	}
+}
+void DXRSample::OnKeyReleased(KeyEventArgs& e)
+{
+	super::OnKeyReleased(e);
+
+	switch (e.Key)
+	{
+	case KeyCode::W:
+		//mWASD.y = 0.0f;
+		break;
+	default:
+		break;
 	}
 }
 
@@ -2403,6 +2427,17 @@ void DXRSample::OnKeyPressed(KeyEventArgs& e)
 		if (g_isDxrSupported)
 			g_raytracingAPI = RaytracingAPI::DirectXRaytracing;
 		break;
+	case KeyCode::W:
+		mWASD.y += 0.1f;
+		break;
+	case KeyCode::S:
+		mWASD.y -= 0.1f;
+		break;
+	case KeyCode::A:
+		mWASD.x -= 0.1f;
+		break;
+	case KeyCode::D:
+		mWASD.x += 0.1f;
 		
 	}
 }
@@ -2432,7 +2467,7 @@ void DXRSample::OnMouseMoved(MouseMotionEventArgs & e)
 		mRadius -= dx - dy;
 
 		// Restrict the radius.
-		mRadius = MathHelper::Clamp(mRadius, -50.0f, 1500.0f);
+		mRadius = MathHelper::Clamp(mRadius, 1.0f, 50.0f);
 	}
 
 	mLastMousePos.x = e.X;
@@ -2441,12 +2476,14 @@ void DXRSample::OnMouseMoved(MouseMotionEventArgs & e)
 }
 void DXRSample::OnMouseWheel(MouseWheelEventArgs& e)
 {
-	g_FoV -= e.WheelDelta;
-	g_FoV = clamp<float>(g_FoV, 12.0f, 90.0f);
+	if (!ImGui::IsAnyWindowFocused()) {
+		g_FoV -= e.WheelDelta;
+		g_FoV = clamp<float>(g_FoV, 12.0f, 90.0f);
 
-	char buffer[256];
-	sprintf_s(buffer, "FoV: %f\n", g_FoV);
-	OutputDebugStringA(buffer);
+		char buffer[256];
+		sprintf_s(buffer, "FoV: %f\n", g_FoV);
+		//OutputDebugStringA(buffer);
+	}
 }
 
 void DXRSample::EnableDXR(IDXGIAdapter1* adapter)

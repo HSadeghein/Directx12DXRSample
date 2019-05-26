@@ -15,6 +15,7 @@
 #include "RaytracingHlslCompat.h"
 
 #define M_PI 3.14159265359f
+
 struct passCB
 {
 	float4x4 gView;
@@ -24,13 +25,13 @@ struct passCB
 	float4x4 gViewProj;
 	float4x4 gInvViewProj;
 	float3 gEyePosW;
-	float cbPerObjectPad1;
+	float lightPower;
 	float2 gRenderTargetSize;
 	float2 gInvRenderTargetSize;
 	float4 lightAmbientColor;
 	float4 lightDiffuseColor;
 	float3 lightPosition;
-	float cbPerObjectPad2;
+	float SpecularPower;
 	float gNearZ;
 	float gFarZ;
 	float gTotalTime;
@@ -50,16 +51,18 @@ struct Vertex
 	float3 normal;
 };
 
-
 RaytracingAccelerationStructure Scene : register(t0, space0);
 RWTexture2D<float4> RenderTarget : register(u0);
-ConstantBuffer<materialCB> g_rayGenCB : register(b0);
+ConstantBuffer<materialCB> g_closestHitCB : register(b0);
 ConstantBuffer<passCB> g_passCB : register(b1);
-ByteAddressBuffer Indices : register(t1);
-StructuredBuffer<Vertex> Vertices : register(t2);
-ByteAddressBuffer LocalIndices : register(t3);
-Buffer<float3> LocalVertices : register(t4);
+ByteAddressBuffer LocalIndices : register(t2);
+Buffer<float3> LocalVertices : register(t3);
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
+
+
+
+static float4 BackGroundColor = float4(0.8f, 0.9f, 1.0f, 1.0f);
+
 struct RayPayload
 {
 	float4 color;
@@ -92,36 +95,36 @@ inline void GenerateCameraRay(uint2 index, out float3 origin, out float3 directi
 }
 
 // Load three 16 bit indices from a byte addressed buffer.
-uint3 Load3x16BitIndices(uint offsetBytes)
-{
-	uint3 indices;
-
-	// ByteAdressBuffer loads must be aligned at a 4 byte boundary.
-	// Since we need to read three 16 bit indices: { 0, 1, 2 } 
-	// aligned at a 4 byte boundary as: { 0 1 } { 2 0 } { 1 2 } { 0 1 } ...
-	// we will load 8 bytes (~ 4 indices { a b | c d }) to handle two possible index triplet layouts,
-	// based on first index's offsetBytes being aligned at the 4 byte boundary or not:
-	//  Aligned:     { 0 1 | 2 - }
-	//  Not aligned: { - 0 | 1 2 }
-	const uint dwordAlignedOffset = offsetBytes & ~3;
-	const uint2 four16BitIndices = Indices.Load2(dwordAlignedOffset);
-
-	// Aligned: { 0 1 | 2 - } => retrieve first three 16bit indices
-	if (dwordAlignedOffset == offsetBytes)
-	{
-		indices.x = four16BitIndices.x & 0xffff;
-		indices.y = (four16BitIndices.x >> 16) & 0xffff;
-		indices.z = four16BitIndices.y & 0xffff;
-	}
-	else // Not aligned: { - 0 | 1 2 } => retrieve last three 16bit indices
-	{
-		indices.x = (four16BitIndices.x >> 16) & 0xffff;
-		indices.y = four16BitIndices.y & 0xffff;
-		indices.z = (four16BitIndices.y >> 16) & 0xffff;
-	}
-
-	return indices;
-}
+//uint3 Load3x16BitIndices(uint offsetBytes)
+//{
+//	uint3 indices;
+//
+//	// ByteAdressBuffer loads must be aligned at a 4 byte boundary.
+//	// Since we need to read three 16 bit indices: { 0, 1, 2 } 
+//	// aligned at a 4 byte boundary as: { 0 1 } { 2 0 } { 1 2 } { 0 1 } ...
+//	// we will load 8 bytes (~ 4 indices { a b | c d }) to handle two possible index triplet layouts,
+//	// based on first index's offsetBytes being aligned at the 4 byte boundary or not:
+//	//  Aligned:     { 0 1 | 2 - }
+//	//  Not aligned: { - 0 | 1 2 }
+//	const uint dwordAlignedOffset = offsetBytes & ~3;
+//	const uint2 four16BitIndices = Indices.Load2(dwordAlignedOffset);
+//
+//	// Aligned: { 0 1 | 2 - } => retrieve first three 16bit indices
+//	if (dwordAlignedOffset == offsetBytes)
+//	{
+//		indices.x = four16BitIndices.x & 0xffff;
+//		indices.y = (four16BitIndices.x >> 16) & 0xffff;
+//		indices.z = four16BitIndices.y & 0xffff;
+//	}
+//	else // Not aligned: { - 0 | 1 2 } => retrieve last three 16bit indices
+//	{
+//		indices.x = (four16BitIndices.x >> 16) & 0xffff;
+//		indices.y = four16BitIndices.y & 0xffff;
+//		indices.z = (four16BitIndices.y >> 16) & 0xffff;
+//	}
+//
+//	return indices;
+//}
 
 // Retrieve hit world position.
 float3 HitWorldPosition()
@@ -152,7 +155,7 @@ float4 CalculateDiffuseLighting(float3 hitPosition, float3 normal)
 	// Diffuse contribution.
 	float fNDotL = max(0.0f, dot(pixelToLight, normal));
 
-	return g_rayGenCB.gDiffuseAlbedo * g_passCB.lightDiffuseColor * fNDotL / M_PI;
+	return g_closestHitCB.gDiffuseAlbedo * g_passCB.lightDiffuseColor * fNDotL * g_passCB.lightPower / M_PI;
 }
 
 float4 CalculateBlinnPhong(float3 hitPosition, float3 normal, float hardness, float isInShadow)
@@ -164,15 +167,24 @@ float4 CalculateBlinnPhong(float3 hitPosition, float3 normal, float hardness, fl
 
 
 	float4 specularColor = float4(0, 0, 0, 0);
+	float intensity = 0.0f;
 	if (!isInShadow) {
 		float3 H = normalize(lightDir + viewDir);
 		float NdotH = dot(normal, H);
-		float intensity = pow(saturate(NdotH), hardness);
+		intensity = pow(saturate(NdotH), hardness);
 
-		specularColor = intensity * g_passCB.lightDiffuseColor / M_PI;
+		specularColor = (intensity) * g_passCB.lightDiffuseColor;
 
 	}
-	return diffuseColor + specularColor;
+	float EnergyConversion = 1 - max(specularColor.r, max(specularColor.g, specularColor.b));
+
+	float4 ambientColor;
+	float4 ambientColorMin = BackGroundColor -0.7f;
+	float4 ambientColorMax = BackGroundColor-0.6;
+	float a = 1 - saturate(dot(normal, float3(0, -1, 0)));
+	ambientColor = g_closestHitCB.gDiffuseAlbedo * lerp(ambientColorMin, ambientColorMax, a);
+
+	return diffuseColor * (1 - intensity) + specularColor + ambientColor;
 
 }
 
@@ -193,12 +205,7 @@ float4 TraceRadianceRay(in Ray ray, in uint currentRayRecursionDepth)
     rayDesc.TMax = 10000;
     RayPayload rayPayload = { float4(0, 0, 0, 0), currentRayRecursionDepth + 1 };
     TraceRay(Scene,
-        RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
-        ~0,
-        0,
-        1,
-        0,
-        rayDesc, rayPayload);
+        RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0,rayDesc, rayPayload);
 
     return rayPayload.color;
 }
@@ -293,7 +300,7 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 	const uint strideInFloat3s = 2;
 	const uint positionOffsetInFloat3s = 0;
 	const uint normalOffsetInFloat3s = 1;
-	const uint3 indices = Indices.Load3(baseIndex);
+	//const uint3 indices = Indices.Load3(baseIndex);
 	const uint3 localindices = LocalIndices.Load3(baseIndex);
 
 	// Retrieve corresponding vertex normals for the triangle vertices.
@@ -317,41 +324,37 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 
 	float3 lightPosition = g_passCB.lightPosition.xyz;
 
-	Ray shadowRay = { hitPosition, normalize(lightPosition - hitPosition) };
+	Ray shadowRay = { hitPosition - 0.001f, normalize(lightPosition - hitPosition) };
 	bool shadowRayHit = TraceShadowRayAndReportIfHit(shadowRay, payload.recursionDepth);
-	float shadowFactor = shadowRayHit ? 0.1 : 1.0f;
 	// Reflected component.
 	float4 reflectedColor = float4(0, 0, 0, 0);
-	if (true)
-	{
-		// Trace a reflection ray.
-		Ray reflectionRay = { HitWorldPosition(), reflect(WorldRayDirection(), localNormal) };
-		float4 reflectionColor = TraceRadianceRay(reflectionRay, payload.recursionDepth);
 
-		float fresnelR = FresnelReflectanceSchlick(WorldRayDirection(), localNormal, g_rayGenCB.gDiffuseAlbedo.xyz);
-		reflectedColor = g_rayGenCB.gRoughness * fresnelR * reflectionColor;
-	}
-	float4 phongColor = CalculateBlinnPhong(hitPosition, localNormal, 200, shadowRayHit);
-	float4 color = g_passCB.lightAmbientColor + phongColor ;
+	 //Trace a reflection ray.
+	//Ray reflectionRay = { HitWorldPosition() -0.001f, reflect(WorldRayDirection(), localNormal) };
+	//float4 reflectionColor = TraceRadianceRay(reflectionRay, payload.recursionDepth);
+
+	//float fresnelR = FresnelReflectanceSchlick(WorldRayDirection(), localNormal, g_closestHitCB.gDiffuseAlbedo.xyz);
+	//reflectedColor =   g_closestHitCB.gRoughness * fresnelR * reflectionColor;
+
+	float4 phongColor = CalculateBlinnPhong(hitPosition, localNormal, g_passCB.SpecularPower, shadowRayHit);
+	float4 color = phongColor;
 
 	float4 finalColor = color + reflectedColor ;
 
-	payload.color = finalColor;
+	// it gives the distance between the point which ray was radiated and the hit point
+	float t = RayTCurrent();
+	finalColor = lerp(finalColor, BackGroundColor, 1.0 - exp(-0.000002 * t * t * t));
 
+	payload.color = finalColor;
 
 }
 
 [shader("miss")]
 void MyMissShader(inout RayPayload payload)
 {
-	payload.color = float4(0.8f, 0.9f, 1.0f, 1.0f);
+	payload.color = BackGroundColor;
 }
 
-// [shader("closesthit")]
-// void MyClosestHitShadowRay(inout ShadowPayLoad payload, in MyAttributes atrr)
-// {
-// 	payload.isHit = true;
-// }
 
 [shader("miss")]
 void MyMissShadowRay(inout ShadowPayLoad payload)
