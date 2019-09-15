@@ -34,4 +34,4 @@ The source code of **Fallback Layer** has been added if you want to see, but if 
 ### Showcase
 | Rasterization | Ray-Tracing |
 | --- | --- |
-| ![Screenshot](Data/Raster.png) | ![Screenshot](Data/Raytracing.png) |
+| ![Screenshot](Data/Raster1.png) | ![Screenshot](Data/Raytracing1.png) |
